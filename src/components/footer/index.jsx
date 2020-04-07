@@ -4,7 +4,9 @@ import './index.scss'
 
 export const Footer = () => (
   <footer className="footer">
-    ©<a href="https://github.com/ddock4you">팥우유</a>
+    © 2014.&nbsp;
+    <a href="https://github.com/ddock4you">RedbeanMilk</a>&nbsp;all rights
+    reserved
     {/* <a href="https://github.com/ddock4you/gatsby-starter-bee">
       Gatsby-starter-bee
     </a> */}
