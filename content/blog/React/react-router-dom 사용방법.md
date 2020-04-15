@@ -1,7 +1,7 @@
 ---
 title: react-router-dom 사용방법
 date: 2020-04-07 23:44:39
-category: React
+category: react
 draft: false
 ---
 
