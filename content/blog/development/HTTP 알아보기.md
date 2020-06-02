@@ -1,5 +1,5 @@
 ---
-title: 'HTTP 알아보기 1'
+title: 'HTTP 알아보기'
 date: 2020-5-26 22:00:13
 category: 'development'
 draft: false
@@ -61,6 +61,129 @@ URL 구조는 아래 이미지를 참고합니다.
 
 ※ 때에 따라서 POST 메서드로 PUT, DELETE 동작도 수행할 수 있습니다.
 
+## HTTP 메시지
+
+클라이언트가 서버에 어떠한 정보를 요청할 때 요청에 대한 정보를 담아 보냅니다. 반대로 서버가 클라이언트에 응답할 때 응답에 대한 정보를 담아 클라이언트로 보냅니다. 이때 정보가 담긴 메시지를 **HTTP 메시지**라고 합니다.
+
+### HTTP 메시지 구조
+
+HTTP 요청과 응답의 구조는 서로 닮았으며, 그 구조는 아래와 같습니다.
+
+![HTTP 메시지 구조](https://mdn.mozillademos.org/files/13827/HTTPMsgStructure2.png)
+
+1. 시작줄(start-line)에는 실행되어야 할 요청, 또는 요청 수행에 대한 성공 또는 실패가 기록되어 있습니다. 이 줄은 항상 한 줄로 끝납니다.
+
+2. 옵션으로 HTTP 헤더 세트가 들어갑니다. 여기에는 요청에 대한 설명 혹은 메시지 본문에 대한 설명이 들어갑니다.
+
+3. 요청에 대한 모든 메타 정보가 전송되었음을 알리는 빈 줄(blank line)이 삽입됩니다.
+
+4. 요청과 관련 내용(HTML 폼 콘텐츠 등)이 옵션으로 들어가거나, 응답과 관련된 문서(document)가 들어갑니다. 본문의 존재 유무 및 크기는 첫 줄과 HTTP 헤더에 명시됩니다.
+
+### 요청 메시지
+
+```console
+GET /hello.txt HTTP/1.1
+User-Agent: curl/7.16.3 libcurl/7.16.3 OpenSSL/0.9.7l zlib/1.2.3
+Host: www.example.com
+Accept-Language: en, mi
+
+(본문없음)
+```
+
+#### 시작 줄 (Start line)
+
+```console
+GET /hello.txt HTTP/1.1
+```
+
+첫번째는 HTTP 메서드가 옵니다. (GET, PUT, POST 등)
+두번째로 오는 요청 타겟은 주로 URL, 또는 프로토콜, 포트, 도메인의 절대 경로로 나타낼 수도 있으며 이들은 요청 컨텍스틍 의해 특정지어 집니다.</br>
+요청 타겟 포맷은 HTTP 메소드에 따라 달라집니다. </br>
+마지막엔 HTTP 버전이 들어갑니다.
+
+#### 헤더 (HEADER)
+
+```console
+User-Agent: curl/7.16.3 libcurl/7.16.3 OpenSSL/0.9.7l zlib/1.2.3
+Host: www.example.com
+Accept-Language: en, mi
+```
+
+요청에 들어가는 HTTP 헤더는 HTTP 헤더의 기본 구조를 따릅니다. 대소문자 구분없는 문자열 다음에 콜론(':')이 붙으며, 그 뒤에 오는 값은 헤더에 따라 달라집니다.</br>
+다양한 종류의 요청 헤더가 있는데, 이들은 크게 3가지의 그룹으로 나눌 수 있습니다.
+
+- **Request headers**
+- **General headers**
+- **Entity headers**
+
+![HTTP 메시지 구조](https://mdn.mozillademos.org/files/13821/HTTP_Request_Headers2.png)
+
+#### 본문 (BODY)
+
+본문은 요청의 마지막 부분에 들어갑니다. 모든 요청에 본문이 들어가지는 않습니다. `GET`, `HEAD`, `DELETE`, `OPTIONS`처럼 리소스를 가져오는 요청은 보통 본문이 필요가 없습니다. 일부 요청은 업데이트를 하기 위해 서버에 데이터를 전송합니다. 보통(HTML 폼 데이터를 포함하는) `POST` 요청이 그렇습니다.
+
+본문은 크게 두 가지 종류로 나뉩니다.
+
+- **단일-리소스 본문(single-resource bodies)**: 헤더 두 개(Content-Type와 Content-Length)로 저의된 단일 파일로 구성됩니다.
+- **다중-리소스 본문(multipie-resource bodies)**: 멀티파트 본문으로 구성되는 다중 리소스 본문에서는 파트마다 다른 정보를 지니게 됩니다. 보통 HTML 폼과 관련이 있습니다.
+
+### 응답 메시지
+
+```console
+HTTP/1.1 200 OK
+Date: Mon, 27 Jul 2009 12:28:53 GMT
+Server: Apache
+Last-Modified: Wed, 22 Jul 2009 19:15:56 GMT
+ETag: "34aa387-d-1568eb00"
+Accept-Ranges: bytes
+Content-Length: 51
+Vary: Accept-Encoding
+Content-Type: text/plain
+```
+
+#### 상태 줄 (Status line)
+
+```console
+HTTP/1.1 200 OK
+```
+
+HTTP 응답의 시작 줄은 상태 줄(status line)이라고 불립니다.
+
+첫번째는 `프로토콜 버전`이 앞에 나옵니다.
+두번째는 `상태 코드`가 나옵니다. 상태코드는 요청의 성공 여부를 숫자로 나타냅니다.
+마지막엔 `상태 텍스트`가 나옵니다. 짧고 간결하게 상태 코드에 대한 설명을 글로 나타내어 사람들이 HTTP 메시지를 이해할 때 도움이 됩니다.
+
+#### 헤더 (HEADER)
+
+```console
+Date: Mon, 27 Jul 2009 12:28:53 GMT
+Server: Apache
+Last-Modified: Wed, 22 Jul 2009 19:15:56 GMT
+ETag: "34aa387-d-1568eb00"
+Accept-Ranges: bytes
+Content-Length: 51
+Vary: Accept-Encoding
+Content-Type: text/plain
+```
+
+응답 메시지 헤더와 구조는 같습니다.
+
+- **Request headers**
+- **General headers**
+- **Entity headers**
+
+![HTTP 메시지 구조](https://mdn.mozillademos.org/files/13823/HTTP_Response_Headers2.png)
+
+#### 본문 (BODY)
+
+본문은 응답의 마지막 부분에 들어갑니다. 모든 응답에 본문이 들어가지는 않습니다. `201`, `204`와 같은 상태 코드를 가진 응답에는 보통 본문이 없습니다.
+
+본문은 크게 세 가지 종류로 나뉩니다.
+
+- 이미 길이가 알려진 단일 파일로 구성된 단일-리소스 본문: 헤더 두개(Content-Type와 Content-Length)로 정의 합니다.
+- 길이를 모르는 단일 파일로 구성된 단일-리소스 본문: Transfer-Encoding가 chunked로 설정되어 있으며, 파일은 청크로 나뉘어 인코딩 되어 있습니다.
+- 서로 다른 정보를 담고 있는 멀티파트로 이루어진 다중 리소스 본문: 이 경우는 상대적으로 위의 두 경우에 비해 보기 힘듭니다.
+
 ## HTTP 상태 코드
 
 HTTP 상태 코드는 서버에서 설정해주는 응답(Response) 정보입니다.
@@ -104,6 +227,8 @@ ex) 로그인을 성공하고 나서 대문 페이지로 보낸다거나, 다운
 ## 참조문서
 
 <https://developer.mozilla.org/ko/docs/Web/HTTP/Overview>
+
+<https://developer.mozilla.org/ko/docs/Web/HTTP/Messages>
 
 <https://joshua1988.github.io/web-development/http-part1/>
 
