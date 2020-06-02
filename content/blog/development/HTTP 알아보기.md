@@ -224,6 +224,11 @@ ex) 로그인을 성공하고 나서 대문 페이지로 보낸다거나, 다운
 - **501**: Not Implemented, 요청한 동작에 대해 서버가 수행할 수 없는 경우
 - **503**: Service Unavailable, 서버가 과부하 또는 유지 보수로 내려간 경우
 
+## 알아두면 좋은 HTTP 헤더 내용들
+
+이건 내용 정리하기엔 내용이 방대해서 다른 참조 사이트 링크로 대체합니다.
+<https://www.zerocho.com/category/HTTP/post/5b3ba2d0b3dabd001b53b9db>
+
 ## 참조문서
 
 <https://developer.mozilla.org/ko/docs/Web/HTTP/Overview>
@@ -233,3 +238,5 @@ ex) 로그인을 성공하고 나서 대문 페이지로 보낸다거나, 다운
 <https://joshua1988.github.io/web-development/http-part1/>
 
 <https://www.joinc.co.kr/w/Site/Network_Programing/AdvancedComm/HTTP>
+
+<https://www.zerocho.com/category/HTTP/post/5b3ba2d0b3dabd001b53b9db>
