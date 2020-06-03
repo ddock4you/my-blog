@@ -1,6 +1,6 @@
 ---
 title: REST API와 RESTful API 훓어보기
-date: 2020-04-15 18:04:53
+date: 2020-4-15 18:04:53
 category: development
 draft: false
 ---

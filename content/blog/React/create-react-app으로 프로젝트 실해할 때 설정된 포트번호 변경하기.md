@@ -1,6 +1,6 @@
 ---
 title: create-react-app으로 프로젝트 실행할 때 설정된 포트번호 변경하기
-date: 2020-04-07 23:43:39
+date: 2020-4-7 23:43:39
 category: react
 draft: false
 ---

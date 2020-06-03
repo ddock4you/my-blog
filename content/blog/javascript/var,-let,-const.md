@@ -1,6 +1,6 @@
 ---
 title: var, let, const 특징
-date: 2020-04-15 15:04:83
+date: 2020-4-15 15:04:83
 category: javascript
 draft: false
 ---

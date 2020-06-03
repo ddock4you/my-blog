@@ -1,6 +1,6 @@
 ---
 title: 리액트에서 Font Awesome 사용하기
-date: 2020-04-21 23:04:08
+date: 2020-4-21 23:04:08
 category: react
 draft: false
 ---
