@@ -5,7 +5,9 @@ import { baseUrl } from "@/app/sitemap";
 import { formatDate } from "@/lib/utils";
 import { CustomMDX } from "@/components/MDX";
 import { PostContent } from "@/components/PostContent";
+import { TableOfContents } from "@/components/TableOfContents";
 import Link from "next/link";
+import Giscus from "@/components/Giscus";
 
 // export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
 //   const { slug } = await params;
@@ -66,53 +68,52 @@ export default async function Blog({ params }: { params: Promise<{ slug: string 
   }
 
   return (
-    <>
-      <section>
-        <script
-          type="application/ld+json"
-          suppressHydrationWarning
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "BlogPosting",
-              headline: post.metadata.title,
-              datePublished: post.metadata.publishedAt,
-              dateModified: post.metadata.publishedAt,
-              description: post.metadata.summary,
-              image: post.metadata.image
-                ? `${baseUrl}${post.metadata.image}`
-                : `/og?title=${encodeURIComponent(post.metadata.title)}`,
-              url: `${baseUrl}/posts/${post.slug}`,
-              author: {
-                "@type": "Person",
-                name: "My Portfolio",
-              },
-            }),
-          }}
-        />
-        <h1 className="title font-semibold text-2xl tracking-tighter">{post.metadata.title}</h1>
-        <div className="flex justify-between items-center mt-2 mb-8 text-sm">
-          <p className="text-sm text-neutral-600 dark:text-neutral-400">
-            {formatDate(post.metadata.publishedAt)}
-          </p>
-        </div>
-        <article className="prose">
-          <PostContent content={post.content} />
-        </article>
-        <aside className="not-prose absolute -top-[200px] right-0 -mb-[100px] hidden h-[calc(100%+150px)] xl:block ">
-          <div className="sticky bottom-0  top-[200px] z-10 ml-[5rem] mt-[200px] w-[200px]">
-            <div className="mb-4 border-l px-4 py-2">
-              <div className="mb-1 font-bold">On this page</div>
-              <ul className="text-xs">
-                <li className="font-medium text-pink-600 py-1 transition">
-                  <Link href={`#${post.slug}`}>{post.metadata.title}</Link>
-                </li>
-              </ul>
+    <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <script
+        type="application/ld+json"
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "BlogPosting",
+            headline: post.metadata.title,
+            datePublished: post.metadata.publishedAt,
+            dateModified: post.metadata.publishedAt,
+            description: post.metadata.summary,
+            image: post.metadata.image
+              ? `${baseUrl}${post.metadata.image}`
+              : `/og?title=${encodeURIComponent(post.metadata.title)}`,
+            url: `${baseUrl}/posts/${post.slug}`,
+            author: {
+              "@type": "Person",
+              name: "My Portfolio",
+            },
+          }),
+        }}
+      />
+
+      <div className="flex gap-8">
+        {/* 메인 콘텐츠 */}
+        <main className="flex-1 min-w-0">
+          <article className="prose max-w-none">
+            <h1 className="title font-semibold text-2xl tracking-tighter mb-4">
+              {post.metadata.title}
+            </h1>
+            <div className="flex justify-between items-center mt-2 mb-8 text-sm">
+              <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                {formatDate(post.metadata.publishedAt)}
+              </p>
             </div>
-          </div>
-        </aside>
-      </section>
-    </>
+            <PostContent content={post.content} />
+          </article>
+          <Giscus />
+        </main>
+        {/* 목차 사이드바 - 데스크톱에서만 표시 */}
+        <div className="hidden xl:block">
+          <TableOfContents />
+        </div>
+      </div>
+    </div>
   );
 }
 
