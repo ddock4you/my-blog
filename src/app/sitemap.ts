@@ -1,17 +1,25 @@
-import { getBlogPosts } from "@/lib/post";
+import { getBlogPosts, getAllCategories } from "@/lib/post";
 
 export const baseUrl = "http://localhost:3000";
 
 export default async function sitemap() {
-  let posts = getBlogPosts().map((post) => ({
-    url: `${baseUrl}/posts/${post.slug}`,
+  // 개별 포스트들
+  const posts = getBlogPosts().map((post) => ({
+    url: `${baseUrl}/posts/${post.category}/${post.slug}`,
     lastModified: post.metadata.publishedAt,
   }));
 
-  let routes = ["", "/posts"].map((route) => ({
+  // 카테고리 페이지들
+  const categories = getAllCategories().map((category) => ({
+    url: `${baseUrl}/posts/${category.name}`,
+    lastModified: new Date().toISOString().split("T")[0],
+  }));
+
+  // 기본 라우트들
+  const routes = ["", "/posts", "/about"].map((route) => ({
     url: `${baseUrl}${route}`,
     lastModified: new Date().toISOString().split("T")[0],
   }));
 
-  return [...routes, ...posts];
+  return [...routes, ...categories, ...posts];
 }

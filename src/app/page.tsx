@@ -62,9 +62,15 @@ export default function Home() {
               key={post.slug}
               className="group p-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
             >
-              <Link href={`/posts/${post.slug}`}>
+              <Link href={`/posts/${post.category}/${post.slug}`}>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div className="flex-1">
+                    {/* 카테고리 태그 */}
+                    <div className="mb-2">
+                      <span className="inline-block px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full capitalize">
+                        {post.category}
+                      </span>
+                    </div>
                     <h3 className="text-xl font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors mb-2">
                       {post.metadata.title}
                     </h3>
