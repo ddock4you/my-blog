@@ -47,7 +47,7 @@ export default function BlogPosts() {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {categories.map((category) => (
-            <CategoryCard key={category.name} category={category} />
+            <CategoryCard key={category.slug} category={category} />
           ))}
         </div>
       </div>
@@ -66,8 +66,8 @@ export default function BlogPosts() {
                   <div className="flex-1">
                     {/* 카테고리 태그 */}
                     <div className="mb-3">
-                      <span className="inline-block px-3 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full capitalize">
-                        {post.category}
+                      <span className="inline-block px-3 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full">
+                        {post.categoryName}
                       </span>
                     </div>
 
@@ -108,12 +108,12 @@ export default function BlogPosts() {
             <div className="flex flex-wrap gap-3 justify-center">
               {categories.map((category) => (
                 <Link
-                  key={category.name}
-                  href={`/posts/${category.name}`}
+                  key={category.slug}
+                  href={`/posts/${category.slug}`}
                   className="inline-flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                 >
                   <BookOpen className="mr-2 h-4 w-4" />
-                  <span className="capitalize">{category.name}</span>
+                  <span>{category.name}</span>
                   <span className="ml-2 text-xs bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded-full">
                     {category.count}
                   </span>

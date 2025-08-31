@@ -7,13 +7,13 @@ import { Calendar, ArrowRight, BookOpen } from "lucide-react";
 export async function generateStaticParams() {
   const categories = getAllCategories();
   return categories.map((category) => ({
-    category: category.name,
+    category: category.slug,
   }));
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ category: string }> }) {
-  const { category } = await params;
-  const posts = getPostsByCategory(category);
+export async function generateMetadata({ params }: { params: { category: string } }) {
+  const { category: categorySlug } = params;
+  const posts = getPostsByCategory(categorySlug);
 
   if (posts.length === 0) {
     return {
@@ -21,15 +21,19 @@ export async function generateMetadata({ params }: { params: Promise<{ category:
     };
   }
 
+  const categories = getAllCategories();
+  const categoryInfo = categories.find((c) => c.slug === categorySlug);
+  const categoryName = categoryInfo ? categoryInfo.name : categorySlug;
+
   return {
-    title: `${category} 카테고리 - 포스트 목록`,
-    description: `${category} 카테고리의 모든 포스트들을 확인해보세요. 총 ${posts.length}개의 포스트가 있습니다.`,
+    title: `${categoryName} 카테고리 - 포스트 목록`,
+    description: `${categoryName} 카테고리의 모든 포스트들을 확인해보세요. 총 ${posts.length}개의 포스트가 있습니다.`,
   };
 }
 
-export default async function CategoryPage({ params }: { params: Promise<{ category: string }> }) {
-  const { category } = await params;
-  const posts = getPostsByCategory(category).sort((a, b) => {
+export default function CategoryPage({ params }: { params: { category: string } }) {
+  const { category: categorySlug } = params;
+  const posts = getPostsByCategory(categorySlug).sort((a, b) => {
     if (new Date(a.metadata.publishedAt) > new Date(b.metadata.publishedAt)) {
       return -1;
     }
@@ -40,6 +44,10 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
     notFound();
   }
 
+  const categories = getAllCategories();
+  const categoryInfo = categories.find((c) => c.slug === categorySlug);
+  const categoryName = categoryInfo ? categoryInfo.name : categorySlug;
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       {/* 브레드크럼 네비게이션 */}
@@ -48,19 +56,19 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
           포스트
         </Link>
         <span>/</span>
-        <span className="text-gray-900 dark:text-gray-100 capitalize">{category}</span>
+        <span className="text-gray-900 dark:text-gray-100">{categoryName}</span>
       </nav>
 
       {/* 헤더 섹션 */}
       <div className="mb-12">
         <div className="flex items-center gap-3 mb-4">
           <BookOpen className="h-8 w-8 text-blue-600" />
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white capitalize">
-            {category}
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white">
+            {categoryName}
           </h1>
         </div>
         <p className="text-xl text-gray-600 dark:text-gray-300 mb-6">
-          {category} 카테고리의 모든 포스트들입니다.
+          {categoryName} 카테고리의 모든 포스트들입니다.
         </p>
         <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
           <span>총 {posts.length}개의 포스트</span>
@@ -77,8 +85,8 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
             <div className="flex flex-col space-y-3">
               {/* 카테고리 태그 */}
               <div className="flex items-center gap-2">
-                <span className="inline-block px-3 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full capitalize">
-                  {post.category}
+                <span className="inline-block px-3 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full">
+                  {post.categoryName}
                 </span>
               </div>
 
