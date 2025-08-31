@@ -1,12 +1,12 @@
 /* eslint-disable */
 // @ts-nocheck
-import Link from "next/link";
-import Image from "next/image";
-import { MDXRemote } from "next-mdx-remote/rsc";
-import { highlight } from "sugar-high";
-import rehypeSlug from "rehype-slug";
-import remarkGfm from "remark-gfm";
-import React from "react";
+import Link from 'next/link';
+import Image from 'next/image';
+import { MDXRemote } from 'next-mdx-remote/rsc';
+import rehypePrettyCode from 'rehype-pretty-code';
+import rehypeSlug from 'rehype-slug';
+import remarkGfm from 'remark-gfm';
+import React from 'react';
 
 function Table({ data }: { data: { headers: string[]; rows: string[][] } }) {
   const headers = data.headers.map((header, index) => <th key={index}>{header}</th>);
@@ -31,7 +31,7 @@ function Table({ data }: { data: { headers: string[]; rows: string[][] } }) {
 function CustomLink(props: any) {
   const href = props.href;
 
-  if (href.startsWith("/")) {
+  if (href.startsWith('/')) {
     return (
       <Link href={href} {...props}>
         {props.children}
@@ -39,7 +39,7 @@ function CustomLink(props: any) {
     );
   }
 
-  if (href.startsWith("#")) {
+  if (href.startsWith('#')) {
     return <a {...props} />;
   }
 
@@ -51,50 +51,11 @@ function RoundedImage(props: any) {
 }
 
 function Code({ children, ...props }) {
-  const codeHTML = highlight(children);
-  return <code dangerouslySetInnerHTML={{ __html: codeHTML }} {...props} />;
-}
-
-function slugify(str) {
-  return str
-    .toString()
-    .toLowerCase()
-    .trim() // Remove whitespace from both ends of a string
-    .replace(/\s+/g, "-") // Replace spaces with -
-    .replace(/&/g, "-and-") // Replace & with 'and'
-    .replace(/[^\w\-]+/g, "") // Remove all non-word characters except for -
-    .replace(/\-\-+/g, "-"); // Replace multiple - with single -
-}
-
-function createHeading(level) {
-  const Heading = ({ children }) => {
-    const slug = slugify(children);
-    return React.createElement(
-      `h${level}`,
-      { id: slug },
-      [
-        React.createElement("a", {
-          href: `#${slug}`,
-          key: `link-${slug}`,
-          className: "anchor",
-        }),
-      ],
-      children
-    );
-  };
-
-  Heading.displayName = `Heading${level}`;
-
-  return Heading;
+  // shiki 기반 구문 강조를 위해 기본 code 태그 사용
+  return <code {...props}>{children}</code>;
 }
 
 const components = {
-  h1: createHeading(1),
-  h2: createHeading(2),
-  h3: createHeading(3),
-  h4: createHeading(4),
-  h5: createHeading(5),
-  h6: createHeading(6),
   Image: RoundedImage,
   a: CustomLink,
   code: Code,
@@ -117,13 +78,12 @@ export function CustomMDX(props) {
           ],
           rehypePlugins: [
             // pretty code block
-            // [
-            //   // @ts-ignore
-            //   rehypePrettyCode,
-            //   {
-            //     theme: { dark: "github-dark-dimmed", light: "github-light" },
-            //   },
-            // ],
+            [
+              rehypePrettyCode,
+              {
+                theme: 'github-dark',
+              },
+            ],
             // toc id를 추가하고 제목을 연결
             rehypeSlug,
           ],
