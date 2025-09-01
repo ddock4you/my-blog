@@ -12,6 +12,7 @@ type Metadata = {
   publishedAt: string;
   summary: string;
   image?: string;
+  series?: string;
 };
 
 export type PostWithCategory = {
@@ -21,6 +22,7 @@ export type PostWithCategory = {
   category: string; // slug
   categoryName: string; // korean name
   fullPath: string;
+  series?: string;
 };
 
 export type CategoryInfo = {
@@ -30,10 +32,16 @@ export type CategoryInfo = {
   description?: string;
 };
 
-function parseFrontmatter(fileContent: string) {
+function parseFrontmatter(fileContent: string, filePath: string) {
   const frontmatterRegex = /---\s*([\s\S]*?)\s*---/;
   const match = frontmatterRegex.exec(fileContent);
-  const frontMatterBlock = match![1];
+
+  // If no front matter is found, throw an explicit error
+  if (!match || !match[1]) {
+    throw new Error(`MDX 파일에 front matter가 누락되었습니다: ${filePath}. '---' 블록을 추가해주세요.`);
+  }
+
+  const frontMatterBlock = match[1];
   const content = fileContent.replace(frontmatterRegex, '').trim();
   const frontMatterLines = frontMatterBlock.trim().split('\n');
   const metadata: Partial<Metadata> = {};
@@ -87,7 +95,7 @@ function getAllMDXFiles(
 
 function readMDXFile(filePath: string) {
   const rawContent = fs.readFileSync(filePath, 'utf-8');
-  return parseFrontmatter(rawContent);
+  return parseFrontmatter(rawContent, filePath);
 }
 
 export function getBlogPosts(): PostWithCategory[] {
@@ -105,8 +113,16 @@ export function getBlogPosts(): PostWithCategory[] {
       category,
       categoryName: CATEGORY_MAP[category] || category,
       fullPath: relativePath,
+      series: metadata.series,
     };
   });
+}
+
+export function getPostsBySeries(category: string, series: string): PostWithCategory[] {
+  const categoryPosts = getPostsByCategory(category);
+  return categoryPosts
+    .filter(post => post.series === series)
+    .sort((a, b) => new Date(a.metadata.publishedAt).getTime() - new Date(b.metadata.publishedAt).getTime());
 }
 
 export function getPostsByCategory(category: string): PostWithCategory[] {

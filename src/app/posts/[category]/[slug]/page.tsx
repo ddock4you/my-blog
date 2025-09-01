@@ -1,4 +1,4 @@
-import { getBlogPosts, getPostBySlug } from "@/lib/post";
+import { getBlogPosts, getPostBySlug, getPostsBySeries } from "@/lib/post";
 import { notFound } from "next/navigation";
 import React from "react";
 import { baseUrl } from "@/app/sitemap";
@@ -7,6 +7,7 @@ import { PostContent } from "@/components/PostContent";
 import { TableOfContents } from "@/components/TableOfContents";
 import { RelatedPosts } from "@/components/RelatedPosts";
 import Link from "next/link";
+import { SeriesPosts } from "@/components/SeriesPosts";
 import Giscus from "@/components/Giscus";
 
 export async function generateStaticParams() {
@@ -63,6 +64,7 @@ export default async function BlogPost({
 }) {
   const { category, slug } = await params;
   const post = getPostBySlug(category, slug);
+  const seriesPosts = post?.series ? getPostsBySeries(category, post.series) : [];
 
   if (!post) {
     notFound();
@@ -133,6 +135,7 @@ export default async function BlogPost({
                 {formatDate(post.metadata.publishedAt)}
               </p>
             </div>
+            {post.series && <SeriesPosts currentPostSlug={post.slug} seriesPosts={seriesPosts} seriesName={post.series} />}
             <PostContent content={post.content} />
           </article>
 
