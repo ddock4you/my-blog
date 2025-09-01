@@ -17,14 +17,11 @@ export function TableOfContents() {
   useEffect(() => {
     // 헤딩 요소들 추출
     const headings = document.querySelectorAll('h1, h2, h3');
-    const tocItems: TocItem[] = Array.from(headings).map(heading => {
-      console.log({ heading });
-      return {
-        id: heading.id,
-        text: heading.textContent || '',
-        level: parseInt(heading.tagName.charAt(1)),
-      };
-    });
+    const tocItems: TocItem[] = Array.from(headings).map(heading => ({
+      id: heading.id,
+      text: heading.textContent || '',
+      level: parseInt(heading.tagName.charAt(1)),
+    }));
 
     setToc(tocItems);
 
