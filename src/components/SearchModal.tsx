@@ -156,7 +156,7 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
                 {searchResults.map(post => (
                   <Link
                     key={`${post.category}-${post.slug}`}
-                    href={`/posts/${post.category}/${post.slug}`}
+                    href={`/posts/${post.slug}`}
                     onClick={onClose}
                     className="group block rounded-lg border border-gray-200 p-4 transition-all
                       duration-200 hover:border-blue-300 hover:shadow-md dark:border-gray-700
