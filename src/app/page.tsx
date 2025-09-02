@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { getBlogPosts } from '@/lib/post';
 import { formatDate } from '@/lib/utils';
 import { ArrowRight, Calendar, BookOpen } from 'lucide-react';
@@ -15,37 +16,6 @@ export default function Home() {
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
-      {/* 히어로 섹션 */}
-      <section className="mb-12 py-12 text-center">
-        <h1 className="mb-6 text-4xl font-bold text-gray-900 md:text-6xl dark:text-white">
-          안녕하세요! 👋
-        </h1>
-        <p className="mx-auto mb-8 max-w-2xl text-xl text-gray-600 md:text-2xl dark:text-gray-300">
-          개발과 기술에 대한 이야기를 나누는 공간입니다.
-          <br />
-          새로운 것을 배우고 공유하는 것을 좋아합니다.
-        </p>
-        <div className="flex flex-col justify-center gap-4 sm:flex-row">
-          <Link
-            href="/posts"
-            className="inline-flex items-center rounded-lg bg-blue-600 px-6 py-3 font-medium
-              text-white transition-colors hover:bg-blue-700"
-          >
-            <BookOpen className="mr-2 h-5 w-5" />
-            블로그 둘러보기
-            <ArrowRight className="ml-2 h-5 w-5" />
-          </Link>
-          <Link
-            href="/about"
-            className="inline-flex items-center rounded-lg border border-gray-300 px-6 py-3
-              font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600
-              dark:text-gray-300 dark:hover:bg-gray-800"
-          >
-            더 알아보기
-          </Link>
-        </div>
-      </section>
-
       {/* 최신 포스트 섹션 */}
       <section>
         <div className="mb-8 flex items-center justify-between">
@@ -59,7 +29,6 @@ export default function Home() {
             <ArrowRight className="ml-1 h-4 w-4" />
           </Link>
         </div>
-
         <div className="grid gap-6">
           {allPosts.map(post => (
             <article
@@ -92,6 +61,19 @@ export default function Home() {
                       {formatDate(post.metadata.publishedAt)}
                     </div>
                   </div>
+                  {/* 이미지 썸네일 */}
+                  {post.image && (
+                    <div className="flex-shrink-0 sm:ml-6">
+                      <div className="relative h-24 w-24 overflow-hidden rounded-lg">
+                        <Image
+                          src={post.image}
+                          alt={post.metadata.title}
+                          fill
+                          className="object-cover transition-transform group-hover:scale-105"
+                        />
+                      </div>
+                    </div>
+                  )}
                   <div className="sm:ml-6">
                     <div
                       className="inline-flex items-center font-medium text-blue-600

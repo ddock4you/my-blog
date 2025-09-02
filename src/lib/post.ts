@@ -23,6 +23,7 @@ export type PostWithCategory = {
   categoryName: string; // korean name
   fullPath: string;
   series?: string;
+  image?: string; // 게시글 이미지 경로
 };
 
 export type CategoryInfo = {
@@ -38,7 +39,9 @@ function parseFrontmatter(fileContent: string, filePath: string) {
 
   // If no front matter is found, throw an explicit error
   if (!match || !match[1]) {
-    throw new Error(`MDX 파일에 front matter가 누락되었습니다: ${filePath}. '---' 블록을 추가해주세요.`);
+    throw new Error(
+      `MDX 파일에 front matter가 누락되었습니다: ${filePath}. '---' 블록을 추가해주세요.`
+    );
   }
 
   const frontMatterBlock = match[1];
@@ -114,6 +117,7 @@ export function getBlogPosts(): PostWithCategory[] {
       categoryName: CATEGORY_MAP[category] || category,
       fullPath: relativePath,
       series: metadata.series,
+      image: metadata.image, // 프론트메타에서 이미지 정보 가져오기
     };
   });
 }
@@ -122,7 +126,10 @@ export function getPostsBySeries(category: string, series: string): PostWithCate
   const categoryPosts = getPostsByCategory(category);
   return categoryPosts
     .filter(post => post.series === series)
-    .sort((a, b) => new Date(a.metadata.publishedAt).getTime() - new Date(b.metadata.publishedAt).getTime());
+    .sort(
+      (a, b) =>
+        new Date(a.metadata.publishedAt).getTime() - new Date(b.metadata.publishedAt).getTime()
+    );
 }
 
 export function getPostsByCategory(category: string): PostWithCategory[] {
@@ -182,7 +189,7 @@ export function generateSearchData(): SearchData[] {
     title: post.metadata.title,
     summary: post.metadata.summary,
     publishedAt: post.metadata.publishedAt,
-    image: post.metadata.image,
+    image: post.image || post.metadata.image, // PostWithCategory의 image 필드 우선 사용
   }));
 
   // 발행일 기준으로 정렬 (최신순)

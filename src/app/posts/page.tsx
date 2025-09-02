@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { formatDate } from '@/lib/utils';
 import { getBlogPosts, getAllCategories } from '@/lib/post';
 import { CategoryCard } from '@/components/CategoryCard';
@@ -102,6 +103,20 @@ export default function BlogPosts() {
                       </div>
                     </div>
                   </div>
+
+                  {/* 이미지 썸네일 */}
+                  {post.image && (
+                    <div className="flex-shrink-0 lg:ml-6">
+                      <div className="relative h-32 w-32 overflow-hidden rounded-lg">
+                        <Image
+                          src={post.image}
+                          alt={post.metadata.title}
+                          fill
+                          className="object-cover transition-transform group-hover:scale-105"
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   <div className="flex-shrink-0 lg:ml-6">
                     <div
