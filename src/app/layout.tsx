@@ -29,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ko" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body className="flex min-h-screen flex-col bg-white antialiased dark:bg-gray-900">
         <SearchProvider searchData={searchData}>
-          <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-5xl sm:px-6">
             <Header />
             <main className="flex-1 py-8">{children}</main>
             <Footer />
