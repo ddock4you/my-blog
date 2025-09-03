@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { formatDate } from '@/lib/utils';
+import { formatDate, formatReadingTime } from '@/lib/utils';
 import { getBlogPosts, getAllCategories } from '@/lib/post';
 import { CategoryCard } from '@/components/CategoryCard';
 import { Calendar, Clock, ArrowRight, Grid3X3, BookOpen } from 'lucide-react';
@@ -99,7 +99,8 @@ export default function BlogPosts() {
                         {formatDate(post.metadata.publishedAt)}
                       </div>
                       <div className="flex items-center">
-                        <Clock className="mr-2 h-4 w-4" />약 5분 소요
+                        <Clock className="mr-2 h-4 w-4" />
+                        {formatReadingTime(post.readingTime)}
                       </div>
                     </div>
                   </div>

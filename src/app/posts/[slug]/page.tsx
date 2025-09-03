@@ -100,6 +100,7 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
               category={post.category}
               title={post.metadata.title}
               publishedAt={post.metadata.publishedAt}
+              readingTime={post.readingTime}
             />
             {post.series && (
               <SeriesPosts

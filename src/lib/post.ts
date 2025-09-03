@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { calculateReadingTime } from './utils';
 
 const CATEGORY_MAP: { [key: string]: string } = {
   development: '개발',
@@ -24,6 +25,7 @@ export type PostWithCategory = {
   fullPath: string;
   series?: string;
   image?: string; // 게시글 이미지 경로
+  readingTime: number; // 읽기 시간 (분)
 };
 
 export type CategoryInfo = {
@@ -108,6 +110,7 @@ export function getBlogPosts(): PostWithCategory[] {
   return allFiles.map(({ file, category, relativePath }) => {
     const { metadata, content } = readMDXFile(file);
     const slug = path.basename(relativePath);
+    const readingTime = calculateReadingTime(content);
 
     return {
       metadata,
@@ -118,6 +121,7 @@ export function getBlogPosts(): PostWithCategory[] {
       fullPath: relativePath,
       series: metadata.series,
       image: metadata.image, // 프론트메타에서 이미지 정보 가져오기
+      readingTime, // 읽기 시간 계산
     };
   });
 }

@@ -1,13 +1,15 @@
 import Link from 'next/link';
-import { formatDate } from '@/lib/utils';
+import { formatDate, formatReadingTime } from '@/lib/utils';
+import { Clock } from 'lucide-react';
 
 interface PostHeaderProps {
   category: string;
   title: string;
   publishedAt: string;
+  readingTime: number;
 }
 
-export function PostHeader({ category, title, publishedAt }: PostHeaderProps) {
+export function PostHeader({ category, title, publishedAt, readingTime }: PostHeaderProps) {
   return (
     <header className="mb-6">
       <div className="mb-4">
@@ -22,7 +24,13 @@ export function PostHeader({ category, title, publishedAt }: PostHeaderProps) {
       </div>
       <h1 className="title mb-4 text-2xl font-semibold tracking-tighter">{title}</h1>
       <div className="mt-2 mb-4 flex items-center justify-between text-sm">
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">{formatDate(publishedAt)}</p>
+        <div className="flex items-center gap-4 text-neutral-600 dark:text-neutral-400">
+          <p className="text-sm">{formatDate(publishedAt)}</p>
+          <div className="flex items-center">
+            <Clock className="mr-1 h-4 w-4" />
+            <span className="text-sm">{formatReadingTime(readingTime)}</span>
+          </div>
+        </div>
       </div>
     </header>
   );

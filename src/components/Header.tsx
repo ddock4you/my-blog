@@ -32,16 +32,17 @@ export function Header() {
 
   return (
     <>
-      <header className="dark:bg-accent-foreground sticky top-0 z-50 w-full border-b-2 bg-white">
-        <div className="container px-2 sm:px-4">
-          <div className="flex h-12 items-center justify-between md:h-16">
-            <Logo />
-            <Navigation
-              openSearch={openSearch}
-              toggleDarkMode={toggleDarkMode}
-              isDarkMode={isDarkMode}
-            />
-          </div>
+      <header
+        className="dark:bg-accent-foreground sticky top-0 z-50 h-12 w-full border-b-2 bg-white px-2
+          md:h-16 md:px-4 lg:px-0"
+      >
+        <div className="flex h-full items-center justify-between">
+          <Logo />
+          <Navigation
+            openSearch={openSearch}
+            toggleDarkMode={toggleDarkMode}
+            isDarkMode={isDarkMode}
+          />
         </div>
       </header>
       {/* 검색 모달 */}
@@ -73,9 +74,6 @@ const Navigation = memo(function Navigation({
 }) {
   return (
     <nav className="flex items-center gap-2 text-xs md:text-sm">
-      <Link href="/posts" className="p-1 font-medium md:text-sm dark:text-white">
-        <span>게시글</span>
-      </Link>
       <button onClick={openSearch} className="cursor-pointer p-1 dark:text-white" aria-label="검색">
         <Search className="text-muted-foreground h-4 w-4 md:h-5 md:w-5" />
       </button>
