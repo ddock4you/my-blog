@@ -8,6 +8,8 @@ import { useTheme } from '../hooks/useTheme';
 
 export function Header() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
   const { isDarkMode, toggleDarkMode } = useTheme();
 
   const openSearch = useCallback(() => {
@@ -25,16 +27,43 @@ export function Header() {
     }
   }, []);
 
+  const handleScroll = useCallback(() => {
+    const currentScrollY = window.scrollY;
+
+    // 스크롤이 맨 위에 있을 때는 항상 헤더를 보여줌
+    if (currentScrollY < 10) {
+      setIsHeaderVisible(true);
+    } else {
+      // 스크롤 방향에 따라 헤더 가시성 결정
+      if (currentScrollY > lastScrollY && currentScrollY > 100) {
+        // 아래로 스크롤할 때 헤더 숨김
+        setIsHeaderVisible(false);
+      } else if (currentScrollY < lastScrollY) {
+        // 위로 스크롤할 때 헤더 보임
+        setIsHeaderVisible(true);
+      }
+    }
+
+    setLastScrollY(currentScrollY);
+  }, [lastScrollY]);
+
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
+  useEffect(() => {
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [handleScroll]);
+
   return (
     <>
       <header
-        className="dark:bg-accent-foreground sticky top-0 z-50 h-12 w-full border-b-2 bg-white px-2
-          md:h-16 md:px-4 lg:px-0"
+        className={`dark:bg-accent-foreground sticky top-0 z-50 h-12 w-full border-b-2 bg-white px-2
+          transition-transform duration-300 ease-in-out md:h-16 md:px-4 lg:px-0 ${
+            isHeaderVisible ? 'translate-y-0' : '-translate-y-full'
+          }`}
       >
         <div className="flex h-full items-center justify-between">
           <Logo />
