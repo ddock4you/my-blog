@@ -21,7 +21,7 @@ export default async function Home({ searchParams }: HomeProps) {
   const categories = getAllCategories();
 
   return (
-    <div className="flex flex-col gap-2 md:gap-8">
+    <div className="flex flex-col gap-2 pb-4 md:gap-8">
       {/* 카테고리 목록 */}
       <CategoriesList categories={categories} selectedCategory={category} />
       {/* 포스트 카드 */}

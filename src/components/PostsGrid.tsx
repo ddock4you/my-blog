@@ -11,7 +11,7 @@ interface PostsGridProps {
 export function PostsGrid({
   posts,
   selectedCategory,
-  className = 'md:border-t grid grid-cols-1 gap-8 p-2 md:grid-cols-2 md:p-4 lg:grid-cols-3',
+  className = 'md:border-t grid grid-cols-1 gap-8 p-2 md:grid-cols-2 md:p-4 lg:grid-cols-3 lg:px-0',
 }: PostsGridProps) {
   // 카테고리 필터링
   const filteredPosts = selectedCategory
