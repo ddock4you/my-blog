@@ -1,25 +1,21 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useMemo } from "react";
-import { useSearchData } from "@/contexts/SearchContext";
+import { useState, useEffect, useMemo } from 'react';
+import { useSearchData } from '@/contexts/SearchContext';
+import type { PostWithCategory } from '@/lib/post';
 
-export interface SearchPost {
-  slug: string;
-  category: string;
+export interface SearchResult extends PostWithCategory {
+  matchScore: number;
+  // SearchModal에서 사용하는 필드들을 최상위 레벨에도 추가
   title: string;
   summary: string;
   publishedAt: string;
-  image?: string;
-}
-
-export interface SearchResult extends SearchPost {
-  matchScore: number;
 }
 
 export function useSearch() {
-  const { searchData: allPosts } = useSearchData(); // Context에서 데이터 가져오기
-  const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const { searchData: allPosts } = useSearchData(); // Context에서 검색용 데이터 가져오기
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   // 데이터가 이미 준비되어 있으므로 postsLoaded는 항상 true
@@ -45,10 +41,11 @@ export function useSearch() {
     const query = debouncedQuery.toLowerCase().trim();
     const results: SearchResult[] = [];
 
-    allPosts.forEach((post) => {
-      const title = post.title.toLowerCase();
-      const summary = post.summary.toLowerCase();
-      const category = post.category.toLowerCase();
+    allPosts.forEach(searchPost => {
+      const title = searchPost.title.toLowerCase();
+      const summary = searchPost.summary.toLowerCase();
+      const category = searchPost.category.toLowerCase();
+      const categoryName = searchPost.categoryName.toLowerCase();
 
       let matchScore = 0;
 
@@ -68,16 +65,37 @@ export function useSearch() {
         matchScore += 20;
       }
 
-      // 카테고리에서 일치하는 경우
-      if (category.includes(query)) {
+      // 카테고리에서 일치하는 경우 (영어 slug와 한글 이름 모두 검색)
+      if (category.includes(query) || categoryName.includes(query)) {
         matchScore += 10;
       }
 
       // 매치 점수가 있는 경우에만 결과에 포함
       if (matchScore > 0) {
+        // SearchData를 PostWithCategory 형태로 변환
+        const postWithCategory: PostWithCategory = {
+          metadata: {
+            title: searchPost.title,
+            publishedAt: searchPost.publishedAt,
+            summary: searchPost.summary,
+            image: searchPost.image,
+          },
+          slug: searchPost.slug,
+          content: '', // 검색 결과에서는 content가 필요하지 않음
+          category: searchPost.category,
+          categoryName: searchPost.categoryName,
+          fullPath: `${searchPost.category}/${searchPost.slug}`,
+          image: searchPost.image,
+          readingTime: 0, // 검색 결과에서는 읽기 시간이 필요하지 않음
+        };
+
         results.push({
-          ...post,
+          ...postWithCategory,
           matchScore,
+          // SearchModal에서 사용하는 필드들을 최상위 레벨에도 추가
+          title: searchPost.title,
+          summary: searchPost.summary,
+          publishedAt: searchPost.publishedAt,
         });
       }
     });
@@ -91,10 +109,18 @@ export function useSearch() {
 
   // 검색어 하이라이팅을 위한 함수
   const highlightMatch = (text: string, query: string) => {
-    if (!query.trim()) return text;
+    // text나 query가 없으면 원본 텍스트 반환
+    if (!text || !query || !query.trim()) return text;
 
-    const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
-    return text.replace(regex, '<mark class="bg-yellow-200 dark:bg-yellow-800">$1</mark>');
+    try {
+      const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`(${escapedQuery})`, 'gi');
+      return text.replace(regex, '<mark class="bg-yellow-200 dark:bg-yellow-800">$1</mark>');
+    } catch (error) {
+      // 정규식 오류가 발생하면 원본 텍스트 반환
+      console.warn('정규식 처리 중 오류 발생:', error);
+      return text;
+    }
   };
 
   return {
@@ -104,7 +130,7 @@ export function useSearch() {
     isLoading: isLoading && debouncedQuery.length > 0,
     hasQuery: debouncedQuery.trim().length > 0,
     resultCount: searchResults.length,
-    highlightMatch,
+    highlightMatch: (text: string, query?: string) => highlightMatch(text, query || debouncedQuery),
     postsLoaded,
   };
 }
