@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { calculateReadingTime, slugify } from './utils';
-import { SERIES_REGISTRY, type SeriesMeta } from './series';
+import { SERIES_REGISTRY, type SeriesMeta, findSeriesKey, getSeriesOrder } from './series';
 
 const CATEGORY_MAP: { [key: string]: string } = {
   development: '개발',
@@ -144,12 +144,37 @@ export function getBlogPosts(): PostWithCategory[] {
 
 export function getPostsBySeries(category: string, series: string): PostWithCategory[] {
   const categoryPosts = getPostsByCategory(category);
-  return categoryPosts
-    .filter(post => post.series === series)
-    .sort(
-      (a, b) =>
-        new Date(a.metadata.publishedAt).getTime() - new Date(b.metadata.publishedAt).getTime()
-    );
+  const filtered = categoryPosts.filter(
+    post => (post.series || '').trim().toLowerCase() === (series || '').trim().toLowerCase()
+  );
+
+  // YAML order 우선 적용
+  const key = findSeriesKey(series || '');
+  const order = key ? getSeriesOrder(key) : [];
+
+  if (order.length > 0) {
+    const indexMap = new Map<string, number>();
+    order.forEach((slug, idx) => indexMap.set(slug, idx));
+
+    return [...filtered].sort((a, b) => {
+      const ai = indexMap.has(a.slug) ? indexMap.get(a.slug)! : Number.POSITIVE_INFINITY;
+      const bi = indexMap.has(b.slug) ? indexMap.get(b.slug)! : Number.POSITIVE_INFINITY;
+      if (ai !== bi) return ai - bi;
+      // 보조 정렬: 발행일, 그 다음 슬러그
+      const ad = new Date(a.metadata.publishedAt).getTime();
+      const bd = new Date(b.metadata.publishedAt).getTime();
+      if (ad !== bd) return ad - bd;
+      return a.slug.localeCompare(b.slug);
+    });
+  }
+
+  // fallback: 발행일 오름차순, 그 다음 슬러그
+  return filtered.sort((a, b) => {
+    const ad = new Date(a.metadata.publishedAt).getTime();
+    const bd = new Date(b.metadata.publishedAt).getTime();
+    if (ad !== bd) return ad - bd;
+    return a.slug.localeCompare(b.slug);
+  });
 }
 
 // 카테고리와 무관하게 시리즈명으로 전체 포스트 조회 (대소문자 무시)
@@ -215,10 +240,8 @@ export function getAllSeries(): SeriesInfo[] {
     const categories = Array.from(new Set(sorted.map(p => p.category)));
     const categoryNames = Array.from(new Set(sorted.map(p => p.categoryName)));
 
-    // 레지스트리 대소문자 무시 매칭
-    const registryKey = Object.keys(SERIES_REGISTRY).find(
-      key => key.toLowerCase() === name.toLowerCase()
-    );
+    // 레지스트리 매칭(파일명/aliases/slug 동등)
+    const registryKey = findSeriesKey(name);
     const meta = registryKey ? SERIES_REGISTRY[registryKey] : undefined;
     const slug = slugify(registryKey || name);
 

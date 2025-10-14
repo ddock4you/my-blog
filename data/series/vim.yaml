@@ -1,0 +1,7 @@
+title: 'Vim 가이드'
+description: '기초부터 실전까지 Vim 생산성 올인원 시리즈'
+order:
+  - vim-guide
+  - vim-advanced
+aliases:
+  - Vim

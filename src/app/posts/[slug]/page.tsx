@@ -9,6 +9,7 @@ import { RelatedPosts } from '@/components/RelatedPosts';
 import Link from 'next/link';
 import { SeriesPosts } from '@/components/SeriesPosts';
 import Giscus from '@/components/Giscus';
+import SeriesPrevNextNav from '@/components/SeriesPrevNextNav';
 
 export async function generateStaticParams() {
   const posts = getBlogPosts();
@@ -53,7 +54,7 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
   }
 
   const seriesPosts = post?.series ? getPostsBySeries(post.category, post.series) : [];
-
+  console.log({ seriesPosts });
   return (
     <div className="container mx-auto max-w-6xl px-4 py-8">
       <script
@@ -114,6 +115,13 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
 
           <RelatedPosts currentPost={post} />
           <Giscus />
+          {post.series && (
+            <SeriesPrevNextNav
+              currentPostSlug={post.slug}
+              seriesPosts={seriesPosts}
+              seriesName={post.series}
+            />
+          )}
         </main>
         <div className="hidden xl:block">
           <TableOfContents />
