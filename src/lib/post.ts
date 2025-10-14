@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { calculateReadingTime } from './utils';
+import { calculateReadingTime, slugify } from './utils';
+import { SERIES_REGISTRY, type SeriesMeta } from './series';
 
 const CATEGORY_MAP: { [key: string]: string } = {
   development: '개발',
@@ -33,6 +34,21 @@ export type CategoryInfo = {
   name: string;
   count: number;
   description?: string;
+};
+
+// 시리즈 정보 타입
+export type SeriesInfo = {
+  name: string;
+  slug: string;
+  count: number;
+  categories: string[]; // 카테고리 슬러그 목록
+  categoryNames: string[]; // 카테고리 한글명 목록
+  firstPostSlug: string; // 처음부터 읽기 링크용
+  firstPublishedAt: string;
+  lastPublishedAt: string;
+  coverImage?: string;
+  firstPostSummary?: string;
+  meta?: SeriesMeta; // 레지스트리에서 가져온 메타 정보
 };
 
 function parseFrontmatter(fileContent: string, filePath: string) {
@@ -136,6 +152,18 @@ export function getPostsBySeries(category: string, series: string): PostWithCate
     );
 }
 
+// 카테고리와 무관하게 시리즈명으로 전체 포스트 조회 (대소문자 무시)
+export function getPostsBySeriesName(seriesName: string): PostWithCategory[] {
+  const allPosts = getBlogPosts();
+  const target = (seriesName || '').trim().toLowerCase();
+  return allPosts
+    .filter(post => (post.series || '').trim().toLowerCase() === target)
+    .sort(
+      (a, b) =>
+        new Date(a.metadata.publishedAt).getTime() - new Date(b.metadata.publishedAt).getTime()
+    );
+}
+
 export function getPostsByCategory(category: string): PostWithCategory[] {
   const allPosts = getBlogPosts();
   return allPosts.filter(post => post.category === category);
@@ -160,6 +188,60 @@ export function getAllCategories(): CategoryInfo[] {
 export function getPostBySlug(category: string, slug: string): PostWithCategory | undefined {
   const allPosts = getBlogPosts();
   return allPosts.find(post => post.category === category && post.slug === slug);
+}
+
+// 모든 시리즈 집계
+export function getAllSeries(): SeriesInfo[] {
+  const posts = getBlogPosts().filter(p => (p.series || '').trim() !== '');
+
+  const seriesMap = new Map<string, PostWithCategory[]>();
+
+  posts.forEach(post => {
+    const seriesName = (post.series || '').trim();
+    if (!seriesName) return;
+    const arr = seriesMap.get(seriesName) || [];
+    arr.push(post);
+    seriesMap.set(seriesName, arr);
+  });
+
+  const seriesList: SeriesInfo[] = Array.from(seriesMap.entries()).map(([name, seriesPosts]) => {
+    const sorted = [...seriesPosts].sort(
+      (a, b) =>
+        new Date(a.metadata.publishedAt).getTime() - new Date(b.metadata.publishedAt).getTime()
+    );
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+
+    const categories = Array.from(new Set(sorted.map(p => p.category)));
+    const categoryNames = Array.from(new Set(sorted.map(p => p.categoryName)));
+
+    // 레지스트리 대소문자 무시 매칭
+    const registryKey = Object.keys(SERIES_REGISTRY).find(
+      key => key.toLowerCase() === name.toLowerCase()
+    );
+    const meta = registryKey ? SERIES_REGISTRY[registryKey] : undefined;
+    const slug = slugify(registryKey || name);
+
+    return {
+      name,
+      slug,
+      count: sorted.length,
+      categories,
+      categoryNames,
+      firstPostSlug: first.slug,
+      firstPublishedAt: first.metadata.publishedAt,
+      lastPublishedAt: last.metadata.publishedAt,
+      coverImage: first.image || first.metadata.image,
+      firstPostSummary: first.metadata.summary,
+      meta,
+    };
+  });
+
+  return seriesList.sort((a, b) => {
+    const ad = new Date(a.lastPublishedAt).getTime();
+    const bd = new Date(b.lastPublishedAt).getTime();
+    return bd - ad; // 최신 시리즈 우선
+  });
 }
 
 // 기존 함수와의 호환성을 위해 유지 (deprecated)

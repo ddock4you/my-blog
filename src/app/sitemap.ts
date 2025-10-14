@@ -1,4 +1,4 @@
-import { getBlogPosts, getAllCategories } from '@/lib/post';
+import { getBlogPosts, getAllCategories, getAllSeries } from '@/lib/post';
 
 export const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
@@ -16,10 +16,16 @@ export default async function sitemap() {
   }));
 
   // 기본 라우트들
-  const routes = ['', '/posts', '/about'].map(route => ({
+  const routes = ['', '/posts', '/about', '/series'].map(route => ({
     url: `${baseUrl}${route}`,
     lastModified: new Date().toISOString().split('T')[0],
   }));
 
-  return [...routes, ...categories, ...posts];
+  // 시리즈 페이지들
+  const series = getAllSeries().map(s => ({
+    url: `${baseUrl}/series/${s.slug}`,
+    lastModified: s.lastPublishedAt,
+  }));
+
+  return [...routes, ...categories, ...series, ...posts];
 }

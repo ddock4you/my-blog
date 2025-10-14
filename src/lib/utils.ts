@@ -86,3 +86,11 @@ export function formatReadingTime(minutes: number): string {
   }
   return `${minutes}분 읽기`;
 }
+
+/**
+ * 간단한 슬러그 생성기: 앞뒤 공백 제거 후 공백을 하이픈으로 바꾸고 소문자로 변환합니다.
+ * 한글/비영문자는 그대로 유지합니다(Next.js 라우팅에 사용 가능).
+ */
+export function slugify(input: string): string {
+  return input.trim().toLowerCase().replace(/\s+/g, '-');
+}

@@ -22,6 +22,16 @@ function PostCard({ post }: { post: PostWithCategory }) {
           <Badge className="mr-2 rounded-sm bg-gray-500 text-white">{post.categoryName}</Badge>
           {post.metadata.title}
         </p>
+        {post.series && (
+          <div className="-mt-1 mb-1 text-xs text-blue-600 dark:text-blue-400">
+            <Link
+              href={`/series/${post.series.toLowerCase().replace(/\s+/g, '-')}`}
+              className="hover:underline"
+            >
+              #{post.series}
+            </Link>
+          </div>
+        )}
         <p className="line-clamp-3 text-xs text-gray-500 md:h-[60px] md:text-sm">
           {post.metadata.summary}
         </p>

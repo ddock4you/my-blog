@@ -15,7 +15,14 @@ export function SeriesPosts({ currentPostSlug, seriesPosts, seriesName }: Series
   return (
     <div className="mb-8 rounded-lg border border-gray-200 p-4 dark:border-gray-700">
       <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-        시리즈: {seriesName}
+        시리즈:{' '}
+        <Link
+          href={`/series/${seriesName.toLowerCase().replace(/\s+/g, '-')}`}
+          className="underline decoration-dotted underline-offset-4 hover:text-blue-600
+            dark:hover:text-blue-400"
+        >
+          {seriesName}
+        </Link>
       </h3>
       <ol className="list-inside list-decimal space-y-2">
         {seriesPosts.map(post => (
