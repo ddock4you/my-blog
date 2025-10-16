@@ -3,20 +3,18 @@ import Link from 'next/link';
 export function Footer() {
   const year = new Date().getFullYear();
   return (
-    <footer className="bg-accent/50 border-t">
-      <div className="mx-auto max-w-5xl px-2 py-4">
+    <footer className="border-border-primary mx-7 border-t py-8">
+      <div className="mx-auto max-w-5xl py-4">
         <div className="flex flex-col items-center justify-between gap-4">
-          <Link
-            href="https://github.com"
+          <a
+            href="https://github.com/ddock4you"
             target="_blank"
             rel="noopener noreferrer"
             aria-label="GitHub 프로필 보기"
           >
             <svg
-              width="98"
-              height="96"
               viewBox="0 0 98 96"
-              className="h-8 w-8"
+              className="text-border-primary h-8 w-8"
               xmlns="http://www.w3.org/2000/svg"
             >
               <path
@@ -26,10 +24,10 @@ export function Footer() {
                 fill="currentColor"
               />
             </svg>
-          </Link>
+          </a>
           <div className="text-center">
-            <p className="text-muted-foreground text-sm">
-              © {year} <b>BreadFrame</b> all right reserved.
+            <p className="text-text-primary text-sm">
+              © {year} <b>BreadPan</b> All Rights reserved.
             </p>
           </div>
         </div>

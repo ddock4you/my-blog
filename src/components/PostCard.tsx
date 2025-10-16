@@ -8,45 +8,30 @@ import { Badge } from './ui/badge';
 
 function PostCard({ post }: { post: PostWithCategory }) {
   return (
-    <div>
-      <Link className="flex flex-col gap-2" href={`/posts/${post.slug}`}>
-        <div className="relative aspect-video w-full overflow-hidden">
-          <Image
-            src={post.image || ''}
-            alt={`${post.metadata.title} 썸네일`}
-            fill
-            className="object-cover"
-          />
-        </div>
-        <p className="line-clamp-2 text-sm font-bold md:h-[48px] md:text-base">
-          <Badge className="mr-2 rounded-sm bg-gray-500 text-white">{post.categoryName}</Badge>
-          {post.metadata.title}
-        </p>
-        {post.series && (
-          <div className="-mt-1 mb-1 text-xs text-blue-600 dark:text-blue-400">
-            <Link
-              href={`/series/${post.series.toLowerCase().replace(/\s+/g, '-')}`}
-              className="hover:underline"
-            >
-              #{post.series}
-            </Link>
-          </div>
-        )}
-        <p className="line-clamp-3 text-xs text-gray-500 md:h-[60px] md:text-sm">
-          {post.metadata.summary}
-        </p>
-        <div className="flex items-center justify-between text-xs text-gray-500 md:text-sm">
+    <Link className="flex flex-col gap-5" href={`/posts/${post.slug}`}>
+      <p className="relative aspect-square">
+        <Image
+          src={post.image || ''}
+          alt={`${post.metadata.title} 썸네일`}
+          fill
+          className="object-cover"
+        />
+      </p>
+      <div className="text-text-primary flex flex-col gap-4">
+        <p className="line-clamp-1 font-bold">{post.metadata.title}</p>
+        <p className="line-clamp-2 h-10 text-sm">{post.metadata.summary}</p>
+        <div className="flex items-center gap-3 text-sm">
           <div className="flex items-center">
-            <Calendar className="mr-2 h-3 w-3" />
+            <Calendar className="text-border-primary mr-2 h-4.5 w-4.5" />
             {formatDate(post.metadata.publishedAt)}
           </div>
           <div className="flex items-center">
-            <Clock className="mr-2 h-3 w-3" />
+            <Clock className="text-border-primary mr-2 h-4.5 w-4.5" />
             {formatReadingTime(post.readingTime)}
           </div>
         </div>
-      </Link>
-    </div>
+      </div>
+    </Link>
   );
 }
 

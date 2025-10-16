@@ -1,14 +1,16 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { IBM_Plex_Sans_KR, Geist_Mono } from 'next/font/google';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { SearchProvider } from '@/contexts/SearchContext';
 import { generateSearchData } from '@/lib/post';
 import './globals.css';
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+const ibmPlexSansKr = IBM_Plex_Sans_KR({
+  variable: '--font-ibm-plex-sans-kr',
   subsets: ['latin'],
+  weight: ['100', '200', '300', '400', '500', '600', '700'],
+  display: 'swap',
 });
 
 const geistMono = Geist_Mono({
@@ -26,8 +28,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const searchData = generateSearchData();
 
   return (
-    <html lang="ko" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body className="flex min-h-screen flex-col bg-white antialiased dark:bg-gray-900">
+    <html lang="ko" className={`${ibmPlexSansKr.variable}`}>
+      <body className="font-ibm bg-bg-inverse-white flex min-h-screen flex-col antialiased">
         <SearchProvider searchData={searchData}>
           <div className="mx-auto w-full max-w-5xl lg:w-5xl">
             <Header />

@@ -5,6 +5,7 @@ import { slugify } from './utils';
 
 export type SeriesMeta = {
   title: string;
+  inSeries: '완료' | '연재중' | '중단'; // 연재 상태
   description?: string;
   order?: string[]; // 시리즈 내 포스트 slug 순서
   aliases?: string[]; // 시리즈 식별을 위한 별칭(표기 차이 등)
@@ -43,8 +44,14 @@ function loadSeriesRegistryFromDisk(): SeriesRegistry {
       const aliases: string[] | undefined = Array.isArray(data.aliases)
         ? data.aliases.map((v: unknown) => String(v))
         : undefined;
+      const inSeriesRaw = data.inSeries;
+      const allowed = ['완료', '연재중', '중단'] as const;
+      const inSeries: '완료' | '연재중' | '중단' =
+        typeof inSeriesRaw === 'string' && allowed.includes(inSeriesRaw as any)
+          ? (inSeriesRaw as any)
+          : undefined;
 
-      registry[key] = { title, description, order, aliases };
+      registry[key] = { title, description, order, aliases, inSeries };
     } catch {
       // 디스크 읽기/파싱 예외는 무시하고 다음 파일로 진행
     }

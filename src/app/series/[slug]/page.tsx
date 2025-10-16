@@ -79,6 +79,19 @@ export default async function SeriesDetailPage({ params }: { params: Promise<{ s
           </p>
         )}
         <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+          {series.meta?.inSeries && (
+            <Badge
+              className={
+                series.meta.inSeries === '완료'
+                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
+                  : series.meta.inSeries === '연재중'
+                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
+                    : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200'
+              }
+            >
+              {series.meta.inSeries}
+            </Badge>
+          )}
           <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
             {series.count}부작
           </Badge>

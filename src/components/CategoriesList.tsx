@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect, useCallback } from 'react';
 import { CategoryInfo } from '@/lib/post';
+import clsx from 'clsx';
 
 interface CategoriesListProps {
   categories: CategoryInfo[];
@@ -38,38 +39,43 @@ export function CategoriesList({ categories, selectedCategory }: CategoriesListP
     return () => window.removeEventListener('scroll', handleScroll);
   }, [handleScroll]);
 
+  const allCategories = categories.reduce(
+    (acc, category) => {
+      acc[0].count += category.count;
+      acc.push(category);
+      return acc;
+    },
+    [{ slug: 'all', name: '전체', count: 0 }] as CategoryInfo[]
+  );
+
   return (
     <div
-      className={`dark:bg-accent-foreground sticky top-12 z-40 w-full border-b-2 bg-white py-1
-        transition-transform duration-300 ease-in-out md:top-16 ${
-          isVisible ? 'translate-y-0' : '-translate-y-[calc(100%+60px)]'
-        }`}
+      className={clsx(
+        'sticky top-12 z-40 w-full py-2 transition-transform duration-300 ease-in-out',
+        isVisible ? 'translate-y-0' : '-translate-y-[calc(100%+60px)]'
+      )}
     >
-      <nav className="flex flex-wrap gap-2 border-y px-2 py-1 md:py-2">
-        <Link
-          href="/"
-          className={`px-2 py-1 text-xs md:text-sm ${
-            !selectedCategory
-              ? 'font-bold text-black dark:text-white'
-              : 'font-normal text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
-        >
-          전체
-        </Link>
-        {categories.map((category, index) => (
-          <Link
-            key={category.slug}
-            href={`/?category=${category.slug}`}
-            className={`relative px-2 py-1 text-xs before:absolute before:-left-[5px]
-            before:text-gray-300 before:content-["|"] md:text-sm dark:before:text-gray-600 ${
-              selectedCategory === category.slug
-                ? 'font-bold text-black dark:text-white'
-                : 'font-normal text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-            } `}
-          >
-            {category.name}
-          </Link>
-        ))}
+      <nav className="flex flex-wrap gap-5">
+        {allCategories.map((category, index) => {
+          const isAll = index === 0;
+          const href = isAll ? '/' : `/?category=${category.slug}`;
+          const isActive = isAll ? !selectedCategory : selectedCategory === category.slug;
+
+          return (
+            <Link
+              key={category.slug}
+              href={href}
+              className={clsx(
+                !isAll &&
+                  `before:border-border-tertiary relative before:absolute before:-left-[0.7rem]
+                  before:content-["|"]`,
+                isActive ? 'text-text-primary font-semibold' : 'text-text-secondary'
+              )}
+            >
+              {category.name}
+            </Link>
+          );
+        })}
       </nav>
     </div>
   );
