@@ -66,9 +66,11 @@ export function CategoriesList({ categories, selectedCategory }: CategoriesListP
               key={category.slug}
               href={href}
               className={clsx(
+                'md:text-lg',
                 !isAll &&
-                  `before:border-border-tertiary relative before:absolute before:-left-[0.7rem]
-                  before:content-["|"]`,
+                  `before:border-border-tertiary before:text-border-tertiary relative text-base
+                  before:absolute before:top-1 before:-left-[0.7rem] before:text-sm
+                  before:font-medium before:content-["|"]`,
                 isActive ? 'text-text-primary font-semibold' : 'text-text-secondary'
               )}
             >

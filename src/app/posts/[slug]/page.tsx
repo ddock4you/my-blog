@@ -74,7 +74,7 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
           }),
         }}
       />
-      <main className="flex w-full flex-col gap-12 px-7 pb-11">
+      <main className="flex w-full flex-col gap-12 pb-11">
         <PostHeader
           category={post.category}
           title={post.metadata.title}
@@ -89,7 +89,9 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
             seriesName={seriesMeta.title}
           />
         )}
-        <PostContent content={post.content} />
+        <div className="prose prose-sm md:prose-base dark:prose-invert">
+          <PostContent content={post.content} />
+        </div>
         <Giscus />
         {seriesMeta && (
           <SeriesPrevNextNav

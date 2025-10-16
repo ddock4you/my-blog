@@ -26,7 +26,7 @@ export function MainListNav() {
 
   return (
     <nav aria-label="목록 전환">
-      <ul className="flex gap-4">
+      <ul className="flex gap-4 md:gap-5">
         {MAIN_LIST_ITEMS.map(item => {
           const isActive = isItemActive(item.href);
           return (
@@ -35,7 +35,7 @@ export function MainListNav() {
                 href={item.href}
                 aria-current={isActive ? 'page' : undefined}
                 className={clsx(
-                  'text-text-primary inline-block text-xl',
+                  'text-text-primary inline-block text-xl md:text-2xl',
                   isActive ? 'font-bold' : 'text-text-secondary'
                 )}
               >

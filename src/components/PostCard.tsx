@@ -8,8 +8,8 @@ import { Badge } from './ui/badge';
 
 function PostCard({ post }: { post: PostWithCategory }) {
   return (
-    <Link className="flex flex-col gap-5" href={`/posts/${post.slug}`}>
-      <p className="relative aspect-square">
+    <Link className="flex flex-col gap-5 sm:flex-row sm:gap-5" href={`/posts/${post.slug}`}>
+      <p className="relative aspect-square flex-shrink-0 sm:w-40">
         <Image
           src={post.image || ''}
           alt={`${post.metadata.title} 썸네일`}
@@ -17,10 +17,10 @@ function PostCard({ post }: { post: PostWithCategory }) {
           className="object-cover"
         />
       </p>
-      <div className="text-text-primary flex flex-col gap-4">
-        <p className="line-clamp-1 font-bold">{post.metadata.title}</p>
-        <p className="line-clamp-2 h-10 text-sm">{post.metadata.summary}</p>
-        <div className="flex items-center gap-3 text-sm">
+      <div className="text-text-primary flex flex-col gap-4 sm:justify-center sm:gap-3">
+        <p className="line-clamp-1 font-bold sm:text-lg">{post.metadata.title}</p>
+        <p className="line-clamp-2 h-10 text-sm sm:h-12 sm:text-base">{post.metadata.summary}</p>
+        <div className="flex items-center gap-3 text-sm sm:gap-4 sm:text-base">
           <div className="flex items-center">
             <Calendar className="text-border-primary mr-2 h-4.5 w-4.5" />
             <span className="text-text-primary">{formatDate(post.metadata.publishedAt)}</span>

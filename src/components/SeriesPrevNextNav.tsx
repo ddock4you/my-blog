@@ -26,7 +26,7 @@ export default function SeriesPrevNextNav({
   return (
     <nav aria-label="시리즈 내 이전/다음 글">
       <p className="bg-bg-primary text-text-inverse-white px-5 py-3 font-bold">{seriesName}</p>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="">
         {prevPost && (
           <SeriesNavItem post={prevPost} variant="prev" seriesNumber={currentIndex + 1} />
         )}
@@ -51,7 +51,8 @@ function SeriesNavItem({ post, variant, seriesNumber }: SeriesNavItemProps) {
   return (
     <Link
       href={`/posts/${post.slug}`}
-      className="border-border-primary flex flex-col gap-3 border px-5 py-3 no-underline"
+      className="border-border-primary flex flex-col gap-3 border px-5 py-3 no-underline md:flex-row
+        md:items-center md:gap-5"
     >
       <div className="text-text-primary flex items-center gap-2 text-sm">
         {!isNext && (
@@ -70,14 +71,14 @@ function SeriesNavItem({ post, variant, seriesNumber }: SeriesNavItemProps) {
           />
         )}
       </div>
-      <p className="flex gap-3">
+      <p className="flex items-center gap-3">
         <span
           className="text-text-inverse-white bg-bg-primary flex h-5 w-fit min-w-5 items-center
-            justify-center px-1 text-xs font-semibold"
+            justify-center rounded-sm px-1 text-xs font-semibold md:text-sm"
         >
           {index}
         </span>
-        <span className="text-text-primary truncate text-sm font-semibold">
+        <span className="text-text-primary truncate text-sm font-semibold md:text-base">
           {post.metadata.title}
         </span>
       </p>

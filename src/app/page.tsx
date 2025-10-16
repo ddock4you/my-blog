@@ -11,24 +11,24 @@ interface HomeProps {
 export default async function Home({ searchParams }: HomeProps) {
   const { category } = await searchParams;
 
-  const allPosts = getBlogPosts()
-    .sort((a, b) => {
-      if (new Date(a.metadata.publishedAt) > new Date(b.metadata.publishedAt)) {
-        return -1;
-      }
-      return 1;
-    })
-    .slice(0, 6); // 최신 6개 포스트만 표시
+  const allPosts = getBlogPosts().sort((a, b) => {
+    if (new Date(a.metadata.publishedAt) > new Date(b.metadata.publishedAt)) {
+      return -1;
+    }
+    return 1;
+  });
+
+  const filteredPosts = category ? allPosts.filter(post => post.category === category) : allPosts;
 
   const categories = getAllCategories();
 
   return (
-    <div className="flex flex-col gap-8 px-7">
+    <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-4">
         <MainListNav />
         <CategoriesList categories={categories} selectedCategory={category} />
       </div>
-      <PostList posts={allPosts} selectedCategory={category} />
+      <PostList posts={filteredPosts} selectedCategory={category} />
     </div>
   );
 }

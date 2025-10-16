@@ -62,8 +62,8 @@ export function Header() {
     <>
       <header
         className={clsx(
-          `bg-bg-inverse-white sticky top-0 z-50 w-full px-7 py-11 transition-transform duration-300
-          ease-in-out`,
+          `bg-bg-inverse-white sticky top-0 z-50 w-full px-7 py-6 transition-transform duration-300
+          ease-in-out md:px-10 md:py-12`,
           isHeaderVisible ? 'translate-y-0' : '-translate-y-full'
         )}
       >
@@ -85,7 +85,7 @@ export function Header() {
 function Logo() {
   return (
     <Link href="/" className="text-text-primary flex flex-col gap-2 text-right">
-      <span className="text-xl font-bold">BreadPan</span>
+      <span className="text-xl font-bold md:text-3xl">BreadPan</span>
       <span className="text-sm font-medium">dev</span>
     </Link>
   );
@@ -102,14 +102,14 @@ const Navigation = memo(function Navigation({
 }) {
   return (
     <nav className="flex items-center gap-5 text-sm">
-      <button
+      {/* <button
         onClick={openSearch}
         className="inline-flex cursor-pointer items-center gap-1"
         aria-label="검색"
       >
         <Search className="text-text-primary h-5 w-5" />
         <span className="text-text-primary text-sm font-semibold tracking-tight">검색하기</span>
-      </button>
+      </button> */}
       <button onClick={toggleDarkMode} className="cursor-pointer" aria-label="다크모드 토글">
         {!isDarkMode && <Sun className="text-text-primary h-5 w-5" />}
         {isDarkMode && <Moon className="text-text-primary h-5 w-5" />}

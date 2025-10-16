@@ -61,15 +61,27 @@ export default async function SeriesDetailPage({ params }: { params: Promise<{ s
         }}
       />
       <MainListNav />
-      <section className="bg-bg-inverse-black flex flex-col p-10">
-        <h2 className="text-text-inverse-white mb-4 text-2xl font-bold">
-          {series.meta?.title || series.name}
-        </h2>
-        <p className="text-text-inverse-white mb-8 text-sm leading-7">
-          {series.meta?.description || series.firstPostSummary}
-        </p>
-        <p>
-          {/* <Image src={series.coverImage ?? ''} alt={series.name} fill className="object-cover" /> */}
+      <section
+        className="bg-bg-inverse-black flex flex-col gap-8 p-10 md:flex-row md:items-end md:gap-9"
+      >
+        <div className="flex flex-col gap-1">
+          <h2 className="text-text-inverse-white text-2xl font-bold md:text-3xl">
+            {series.meta?.title || series.name}
+          </h2>
+          <p className="text-text-inverse-white text-sm leading-7 md:text-base">
+            {series.meta?.description || series.firstPostSummary}
+          </p>
+        </div>
+        <p
+          className="relative ml-auto aspect-square w-full max-w-13 flex-none flex-shrink-0
+            md:max-w-20"
+        >
+          <Image
+            src={series.coverImage ?? ''}
+            alt={series.name}
+            fill
+            className="object-contain md:shadow-md"
+          />
         </p>
       </section>
 
@@ -83,43 +95,3 @@ export default async function SeriesDetailPage({ params }: { params: Promise<{ s
     </div>
   );
 }
-
-// <li
-//   key={post.slug}
-//   className="rounded-lg border border-gray-200 p-4 transition-colors hover:border-gray-300
-//     dark:border-gray-700 dark:hover:border-gray-600"
-// >
-//   <div className="flex items-start justify-between gap-4">
-//     <div>
-//       <div className="mb-1 text-xs text-gray-500 dark:text-gray-400">파트 {idx + 1}</div>
-//       <Link
-//         href={`/posts/${post.slug}`}
-//         className="text-lg font-semibold text-gray-900 hover:text-blue-600 dark:text-white
-//           dark:hover:text-blue-400"
-//       >
-//         {post.metadata.title}
-//       </Link>
-//       <p className="mt-1 line-clamp-2 text-sm text-gray-600 dark:text-gray-300">
-//         {post.metadata.summary}
-//       </p>
-//       <div
-//         className="mt-2 flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400"
-//       >
-//         <Badge className="bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
-//           {post.categoryName}
-//         </Badge>
-//         <span className="inline-flex items-center">
-//           <Calendar className="mr-1 h-3 w-3" /> {formatDate(post.metadata.publishedAt)}
-//         </span>
-//       </div>
-//     </div>
-//     <Link
-//       href={`/posts/${post.slug}`}
-//       className="inline-flex items-center rounded-md bg-blue-50 px-3 py-2 text-sm
-//         font-medium text-blue-600 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400
-//         dark:hover:bg-blue-900/30"
-//     >
-//       <BookOpen className="mr-2 h-4 w-4" /> 읽기
-//     </Link>
-//   </div>
-// </li>

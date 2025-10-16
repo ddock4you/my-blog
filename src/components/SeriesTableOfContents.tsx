@@ -30,7 +30,9 @@ export function SeriesTableOfContents({
   return (
     <section className="border-border-inverse-black overflow-hidden border">
       {/* 상단 검은색 바: 시리즈 제목 */}
-      <p className="bg-bg-primary text-text-inverse-white px-5 py-3 font-bold">{seriesName}</p>
+      <p className="bg-bg-primary text-text-inverse-white px-5 py-3 font-bold md:text-lg">
+        {seriesName}
+      </p>
       {/* 아코디언: 현재 회차 표시 */}
       <Accordion type="single" collapsible>
         <AccordionItem value="series-contents">
@@ -39,12 +41,12 @@ export function SeriesTableOfContents({
               {currentNumber && (
                 <span
                   className="text-text-inverse-white bg-bg-primary flex h-5 w-fit min-w-5
-                    items-center justify-center px-1 text-xs font-semibold"
+                    items-center justify-center rounded-sm px-1 text-xs font-semibold md:text-sm"
                 >
                   {currentNumber}
                 </span>
               )}
-              <p className="text-text-primary flex-1 truncate text-sm">
+              <p className="text-text-primary flex-1 truncate text-sm md:text-base">
                 {seriesPosts[currentIndex]?.metadata.title}
               </p>
             </div>
@@ -60,12 +62,20 @@ export function SeriesTableOfContents({
                       className="text-text-primary flex flex-1 gap-3 text-sm"
                     >
                       <span
-                        className="text-text-inverse-white bg-bg-primary flex h-5 w-fit min-w-5
-                          items-center justify-center px-1 text-xs font-semibold"
+                        className={clsx(
+                          `text-text-disabled bg-bg-disabled flex h-5 w-fit min-w-5 items-center
+                          justify-center rounded-sm px-1 text-xs font-semibold md:text-sm`,
+                          isActive && 'text-text-inverse-white bg-bg-primary'
+                        )}
                       >
                         {idx + 1}
                       </span>
-                      <p className={clsx('text-text-primary text-sm', isActive && 'font-bold')}>
+                      <p
+                        className={clsx(
+                          'text-text-disabled text-sm md:text-base',
+                          isActive && 'text-text-primary'
+                        )}
+                      >
                         {post.metadata.title}
                       </p>
                     </Link>

@@ -15,18 +15,20 @@ function SeriesPostCard({
 }) {
   return (
     <Link href={`/posts/${post.slug}`} className="flex flex-col gap-2">
-      <span
-        className="text-text-inverse-white bg-bg-inverse-black flex h-7 w-fit min-w-7 items-center
-          justify-center rounded-md px-2"
-      >
-        {count - idx}
-      </span>
-      <div className="flex flex-col gap-3">
-        <p className="text-text-primary line-clamp-1 font-bold">{post.metadata.title}</p>
-        <p className="text-text-primary line-clamp-2 h-13 text-sm leading-7">
-          {post.metadata.summary}
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
+        <span
+          className="text-text-inverse-white bg-bg-inverse-black flex h-7 w-fit min-w-7 items-center
+            justify-center rounded-md px-2 font-semibold"
+        >
+          {count - idx}
+        </span>
+        <p className="text-text-primary line-clamp-1 font-semibold md:text-lg">
+          {post.metadata.title}
         </p>
-        <div className="text-text-primary flex items-center gap-3 text-sm">
+      </div>
+      <div className="flex flex-col gap-3">
+        <p className="text-text-primary text-sm md:text-base">{post.metadata.summary}</p>
+        <div className="text-text-primary flex items-center gap-3 text-sm sm:gap-4 sm:text-base">
           <div className="flex items-center">
             <Calendar className="text-border-primary mr-2 h-4.5 w-4.5" />
             <span className="text-text-primary">{formatDate(post.metadata.publishedAt)}</span>

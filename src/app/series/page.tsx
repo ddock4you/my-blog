@@ -14,7 +14,7 @@ export default function SeriesIndexPage() {
   // const totalPostsInSeries = seriesList.reduce((acc, s) => acc + s.count, 0);
 
   return (
-    <div className="flex flex-col gap-8 px-7 pb-11">
+    <div className="flex flex-col gap-8 pb-11">
       <MainListNav />
 
       {/* 빈 상태 */}
@@ -27,7 +27,7 @@ export default function SeriesIndexPage() {
 
 function SeriesList({ seriesList }: { seriesList: SeriesInfo[] }) {
   return (
-    <div className="grid grid-cols-1 gap-6">
+    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-11">
       {seriesList.map(series => (
         <SeriesCard key={series.name} series={series} />
       ))}

@@ -34,9 +34,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           antialiased"
       >
         <SearchProvider searchData={searchData}>
-          <div className="mx-auto w-full max-w-5xl lg:w-5xl">
+          <div className="mx-auto w-full max-w-3xl">
             <Header />
-            <main>{children}</main>
+            <main className="px-7 md:px-10">{children}</main>
             <Footer />
           </div>
         </SearchProvider>
