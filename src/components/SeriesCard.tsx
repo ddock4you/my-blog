@@ -8,7 +8,6 @@ import { Badge } from './ui/badge';
 import clsx from 'clsx';
 
 function SeriesCard({ series }: { series: SeriesInfo }) {
-  console.log(series);
   return (
     <Link href={`/series/${series.slug}`} key={series.name} className="flex flex-col gap-8">
       {/* 커버 */}
@@ -42,9 +41,9 @@ function SeriesCard({ series }: { series: SeriesInfo }) {
           </Badge>
         </div>
         <p className="text-text-primary font-bold">{series.meta?.title || series.name}</p>
-        <div className="flex items-center">
+        <div className="flex items-center text-sm">
           <Calendar className="text-border-primary mr-2 h-4.5 w-4.5" />
-          {formatDate(series.firstPublishedAt)}
+          <span className="text-text-primary">{formatDate(series.firstPublishedAt)}</span>
         </div>
       </div>
     </Link>

@@ -29,7 +29,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <html lang="ko" className={`${ibmPlexSansKr.variable}`}>
-      <body className="font-ibm bg-bg-inverse-white flex min-h-screen flex-col antialiased">
+      <body
+        className="font-ibm bg-bg-inverse-white box-sizing-border-box flex min-h-screen flex-col
+          antialiased"
+      >
         <SearchProvider searchData={searchData}>
           <div className="mx-auto w-full max-w-5xl lg:w-5xl">
             <Header />

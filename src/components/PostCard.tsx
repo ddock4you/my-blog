@@ -23,11 +23,11 @@ function PostCard({ post }: { post: PostWithCategory }) {
         <div className="flex items-center gap-3 text-sm">
           <div className="flex items-center">
             <Calendar className="text-border-primary mr-2 h-4.5 w-4.5" />
-            {formatDate(post.metadata.publishedAt)}
+            <span className="text-text-primary">{formatDate(post.metadata.publishedAt)}</span>
           </div>
           <div className="flex items-center">
             <Clock className="text-border-primary mr-2 h-4.5 w-4.5" />
-            {formatReadingTime(post.readingTime)}
+            <span className="text-text-primary">{formatReadingTime(post.readingTime)}</span>
           </div>
         </div>
       </div>

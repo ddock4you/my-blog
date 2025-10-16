@@ -1,5 +1,4 @@
 import { getBlogPosts, getAllCategories, PostWithCategory } from '@/lib/post';
-import { PostsGrid } from '@/components/PostsGrid';
 import { MainListNav } from '@/components/MainListNav';
 import { CategoriesList } from '@/components/CategoriesList';
 import { EmptyState } from '@/components/EmptyState';

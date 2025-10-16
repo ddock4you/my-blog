@@ -1,7 +1,8 @@
+// 현재는 사용하지 않는 컴포넌트
 'use client';
 
 import { useEffect, useState } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, slugify } from '@/lib/utils';
 
 interface TocItem {
   id: string;
@@ -17,11 +18,35 @@ export function TableOfContents() {
   useEffect(() => {
     // 헤딩 요소들 추출
     const headings = document.querySelectorAll('h1, h2, h3');
-    const tocItems: TocItem[] = Array.from(headings).map(heading => ({
-      id: heading.id,
-      text: heading.textContent || '',
-      level: parseInt(heading.tagName.charAt(1)),
-    }));
+
+    // 각 헤딩에 고유 id를 보장 (없으면 생성, 중복이면 접미어 추가)
+    const usedIds = new Set<string>();
+    const tocItems: TocItem[] = Array.from(headings).map((heading, idx) => {
+      const element = heading as HTMLElement;
+
+      const baseText = (element.textContent || '').trim() || `section-${idx + 1}`;
+
+      // 우선 기존 id 사용, 없거나 공백이면 텍스트 기반으로 생성
+      const initialId = (element.id || '').trim();
+      let candidateId = slugify(initialId || baseText) || `section-${idx + 1}`;
+
+      // 중복 방지: 이미 존재하면 -2, -3 ... 접미어 추가
+      let uniqueId = candidateId;
+      let counter = 2;
+      while (usedIds.has(uniqueId)) {
+        uniqueId = `${candidateId}-${counter++}`;
+      }
+      usedIds.add(uniqueId);
+
+      // DOM에도 반영하여 앵커 스크롤이 동작하도록 함
+      element.id = uniqueId;
+
+      return {
+        id: uniqueId,
+        text: baseText,
+        level: parseInt(element.tagName.charAt(1)),
+      };
+    });
 
     setToc(tocItems);
 
@@ -130,8 +155,8 @@ export function TableOfContents() {
           </div>
           <nav>
             <ul className="space-y-1 text-sm">
-              {toc.map(item => (
-                <li key={item.id}>
+              {toc.map((item, idx) => (
+                <li key={`${item.id || 'toc'}-${idx}`}>
                   <button
                     type="button"
                     onClick={() => handleClick(item.id)}

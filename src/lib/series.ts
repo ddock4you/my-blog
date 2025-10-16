@@ -9,6 +9,7 @@ export type SeriesMeta = {
   description?: string;
   order?: string[]; // 시리즈 내 포스트 slug 순서
   aliases?: string[]; // 시리즈 식별을 위한 별칭(표기 차이 등)
+  coverImage?: string; // 시리즈 커버 이미지 경로(선택)
 };
 
 const SERIES_DATA_DIR = path.join(process.cwd(), 'data', 'series');
@@ -50,8 +51,12 @@ function loadSeriesRegistryFromDisk(): SeriesRegistry {
         typeof inSeriesRaw === 'string' && allowed.includes(inSeriesRaw as any)
           ? (inSeriesRaw as any)
           : undefined;
+      const coverImage: string | undefined =
+        typeof data.coverImage === 'string' && data.coverImage.trim() !== ''
+          ? String(data.coverImage)
+          : undefined;
 
-      registry[key] = { title, description, order, aliases, inSeries };
+      registry[key] = { title, description, order, aliases, inSeries, coverImage };
     } catch {
       // 디스크 읽기/파싱 예외는 무시하고 다음 파일로 진행
     }

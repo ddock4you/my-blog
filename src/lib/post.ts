@@ -185,7 +185,7 @@ export function getPostsBySeriesName(seriesName: string): PostWithCategory[] {
     .filter(post => (post.series || '').trim().toLowerCase() === target)
     .sort(
       (a, b) =>
-        new Date(a.metadata.publishedAt).getTime() - new Date(b.metadata.publishedAt).getTime()
+        new Date(b.metadata.publishedAt).getTime() - new Date(a.metadata.publishedAt).getTime()
     );
 }
 
@@ -232,7 +232,7 @@ export function getAllSeries(): SeriesInfo[] {
   const seriesList: SeriesInfo[] = Array.from(seriesMap.entries()).map(([name, seriesPosts]) => {
     const sorted = [...seriesPosts].sort(
       (a, b) =>
-        new Date(a.metadata.publishedAt).getTime() - new Date(b.metadata.publishedAt).getTime()
+        new Date(b.metadata.publishedAt).getTime() - new Date(a.metadata.publishedAt).getTime()
     );
     const first = sorted[0];
     const last = sorted[sorted.length - 1];
@@ -254,7 +254,7 @@ export function getAllSeries(): SeriesInfo[] {
       firstPostSlug: first.slug,
       firstPublishedAt: first.metadata.publishedAt,
       lastPublishedAt: last.metadata.publishedAt,
-      coverImage: first.image || first.metadata.image,
+      coverImage: meta?.coverImage || first.image || first.metadata.image,
       firstPostSummary: first.metadata.summary,
       meta,
     };
@@ -303,7 +303,7 @@ export function generateSearchData(): SearchData[] {
 
   // 발행일 기준으로 정렬 (최신순)
   return searchData.sort((a, b) => {
-    if (new Date(a.publishedAt) > new Date(b.publishedAt)) {
+    if (new Date(b.publishedAt) > new Date(a.publishedAt)) {
       return -1;
     }
     return 1;

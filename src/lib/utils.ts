@@ -12,12 +12,11 @@ export function formatDate(date: string, includeRelative = false) {
   }
   const targetDate = new Date(date);
 
-  // 한국어 표기 (예: 2025년 9월 1일)
-  const fullDate = targetDate.toLocaleDateString('ko-KR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
+  // YYYY-MM-DD 형식으로 날짜 포맷
+  const year = targetDate.getFullYear();
+  const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+  const day = String(targetDate.getDate()).padStart(2, '0');
+  const fullDate = `${year}-${month}-${day}`;
 
   if (!includeRelative) {
     return fullDate;
