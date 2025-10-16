@@ -1,7 +1,5 @@
 import Link from 'next/link';
 import { PostWithCategory } from '@/lib/post';
-import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
 
 type SeriesPrevNextNavProps = {
   currentPostSlug: string;
@@ -26,57 +24,63 @@ export default function SeriesPrevNextNav({
   if (!prevPost && !nextPost) return null;
 
   return (
-    <nav
-      aria-label="시리즈 내 이전/다음 글"
-      className="mt-12 border-t border-gray-200 pt-6 dark:border-gray-700"
-    >
-      <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">시리즈: {seriesName}</div>
+    <nav aria-label="시리즈 내 이전/다음 글">
+      <p className="bg-bg-primary text-text-inverse-white px-5 py-3 font-bold">{seriesName}</p>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {prevPost && (
-          <Link href={`/posts/${prevPost.slug}`} className="no-underline">
-            <Card className="group hover:border-primary/40 h-full border transition-colors">
-              <CardContent className="p-4">
-                <div
-                  className="text-muted-foreground group-hover:text-primary mb-1 flex items-center
-                    gap-2 text-xs font-medium tracking-wide uppercase"
-                >
-                  <ArrowLeft className="size-4" />
-                  이전 글
-                </div>
-                <div
-                  className="text-foreground group-hover:text-primary line-clamp-2 text-base
-                    font-semibold"
-                >
-                  {prevPost.metadata.title}
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
+          <SeriesNavItem post={prevPost} variant="prev" seriesNumber={currentIndex + 1} />
         )}
 
         {nextPost && (
-          <Link href={`/posts/${nextPost.slug}`} className="no-underline">
-            <Card className="group hover:border-primary/40 h-full border transition-colors">
-              <CardContent className="p-4">
-                <div
-                  className="text-muted-foreground group-hover:text-primary mb-1 flex items-center
-                    justify-end gap-2 text-right text-xs font-medium tracking-wide uppercase
-                    md:justify-end"
-                >
-                  다음 글
-                  <ArrowRight className="size-4" />
-                </div>
-                <div
-                  className="text-foreground group-hover:text-primary line-clamp-2 text-right
-                    text-base font-semibold"
-                >
-                  {nextPost.metadata.title}
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
+          <SeriesNavItem post={nextPost} variant="next" seriesNumber={currentIndex + 1} />
         )}
       </div>
     </nav>
+  );
+}
+
+type SeriesNavItemProps = {
+  post: PostWithCategory;
+  variant: 'prev' | 'next';
+  seriesNumber: number;
+};
+
+function SeriesNavItem({ post, variant, seriesNumber }: SeriesNavItemProps) {
+  const isNext = variant === 'next';
+  const index = isNext ? seriesNumber + 1 : seriesNumber - 1;
+  return (
+    <Link
+      href={`/posts/${post.slug}`}
+      className="border-border-primary flex flex-col gap-3 border px-5 py-3 no-underline"
+    >
+      <div className="text-text-primary flex items-center gap-2 text-sm">
+        {!isNext && (
+          <span
+            aria-hidden
+            className="inline-block h-0 w-0 border-y-[4px] border-r-[8px] border-y-transparent
+              [border-right-color:currentColor]"
+          />
+        )}
+        <span>{isNext ? '다음 포스팅' : '이전 포스팅'}</span>
+        {isNext && (
+          <span
+            aria-hidden
+            className="inline-block h-0 w-0 border-y-[4px] border-l-[8px] border-y-transparent
+              [border-left-color:currentColor]"
+          />
+        )}
+      </div>
+      <p className="flex gap-3">
+        <span
+          className="text-text-inverse-white bg-bg-primary flex h-5 w-fit min-w-5 items-center
+            justify-center px-1 text-xs font-semibold"
+        >
+          {index}
+        </span>
+        <span className="text-text-primary truncate text-sm font-semibold">
+          {post.metadata.title}
+        </span>
+      </p>
+    </Link>
   );
 }

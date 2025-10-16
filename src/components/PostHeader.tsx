@@ -1,35 +1,44 @@
 import Link from 'next/link';
 import { formatDate, formatReadingTime } from '@/lib/utils';
-import { Clock } from 'lucide-react';
+import { Calendar, Clock } from 'lucide-react';
+import { Badge } from './ui/badge';
+import { SeriesMeta } from '@/lib/series';
 
 interface PostHeaderProps {
   category: string;
   title: string;
   publishedAt: string;
   readingTime: number;
+  seriesMeta: SeriesMeta | null;
 }
 
-export function PostHeader({ category, title, publishedAt, readingTime }: PostHeaderProps) {
+export function PostHeader({
+  category,
+  title,
+  publishedAt,
+  readingTime,
+  seriesMeta,
+}: PostHeaderProps) {
   return (
-    <header className="mb-6">
-      <div className="mb-4">
-        <Link
-          href={`/posts/${category}`}
-          className="inline-block rounded-full bg-blue-100 px-3 py-1 text-xs font-medium
-            text-blue-800 capitalize transition-colors hover:bg-blue-200 dark:bg-blue-900
-            dark:text-blue-200 dark:hover:bg-blue-800"
-        >
-          {category}
-        </Link>
+    <header className="flex flex-col gap-5">
+      <div className="flex gap-2">
+        {seriesMeta && (
+          <>
+            <Badge className="">{seriesMeta.order?.length} 개</Badge>
+            <Badge className="">{seriesMeta.inSeries}</Badge>
+          </>
+        )}
+        {!seriesMeta && <Badge className="">{category}</Badge>}
       </div>
-      <h1 className="title mb-4 text-2xl font-semibold tracking-tighter">{title}</h1>
-      <div className="mt-2 mb-4 flex items-center justify-between text-sm">
-        <div className="flex items-center gap-4 text-neutral-600 dark:text-neutral-400">
-          <p className="text-sm">{formatDate(publishedAt)}</p>
-          <div className="flex items-center">
-            <Clock className="mr-1 h-4 w-4" />
-            <span className="text-sm">{formatReadingTime(readingTime)}</span>
-          </div>
+      <h1 className="title text-text-primary text-2xl font-semibold tracking-tighter">{title}</h1>
+      <div className="flex items-center gap-3 text-sm">
+        <div className="flex items-center">
+          <Calendar className="text-border-primary mr-2 h-4.5 w-4.5" />
+          <span className="text-text-primary">{formatDate(publishedAt)}</span>
+        </div>
+        <div className="flex items-center">
+          <Clock className="text-border-primary mr-2 h-4.5 w-4.5" />
+          <span className="text-text-primary">{formatReadingTime(readingTime)}</span>
         </div>
       </div>
     </header>

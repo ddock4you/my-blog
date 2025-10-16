@@ -116,5 +116,30 @@ export function getSeriesOrder(seriesName: string): string[] {
   return normalized;
 }
 
+// post?.series(문자열)로부터 시리즈 메타/정리 정보를 가져오기 위한 헬퍼
+export function getSeriesMeta(seriesName: string): SeriesMeta | undefined {
+  const registry = getSeriesRegistry();
+  const key = findSeriesKey(seriesName);
+  if (!key) return undefined;
+  return registry[key];
+}
+
+export type ResolvedSeriesInfo = {
+  key: string; // 레지스트리 키(파일명 기반 canonical)
+  slug: string; // URL-friendly slug
+  meta?: SeriesMeta; // 시리즈 메타(YAML)
+  order: string[]; // 포스트 slug 정렬 우선순위
+};
+
+export function getSeriesInfoByName(seriesName: string): ResolvedSeriesInfo | undefined {
+  const key = findSeriesKey(seriesName);
+  if (!key) return undefined;
+  const registry = getSeriesRegistry();
+  const meta = registry[key];
+  const slug = slugify(key);
+  const order = getSeriesOrder(key);
+  return { key, slug, meta, order };
+}
+
 // 구버전 사용 코드와 호환을 위해 유지: 정적 상수 대신 로더 기반 레지스트리를 노출
 export const SERIES_REGISTRY: SeriesRegistry = getSeriesRegistry();

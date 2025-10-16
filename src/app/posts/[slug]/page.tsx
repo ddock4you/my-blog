@@ -1,15 +1,14 @@
-import { getBlogPosts, getPostBySlug, getPostsBySeries } from '@/lib/post';
+import { getBlogPosts, getPostsBySeries } from '@/lib/post';
 import { notFound } from 'next/navigation';
 import React from 'react';
 import { baseUrl } from '@/app/sitemap';
 import { PostContent } from '@/components/PostContent';
 import { PostHeader } from '@/components/PostHeader';
-import { TableOfContents } from '@/components/TableOfContents';
 import { RelatedPosts } from '@/components/RelatedPosts';
-import Link from 'next/link';
-import { SeriesPosts } from '@/components/SeriesPosts';
+import { SeriesTableOfContents } from '@/components/SeriesTableOfContents';
 import Giscus from '@/components/Giscus';
 import SeriesPrevNextNav from '@/components/SeriesPrevNextNav';
+import { getSeriesMeta } from '@/lib/series';
 
 export async function generateStaticParams() {
   const posts = getBlogPosts();
@@ -52,11 +51,10 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
   if (!post) {
     notFound();
   }
-
+  const seriesMeta = post?.series ? getSeriesMeta(post.series) : null;
   const seriesPosts = post?.series ? getPostsBySeries(post.category, post.series) : [];
-  console.log({ seriesPosts });
   return (
-    <div className="container mx-auto max-w-6xl px-4 py-8">
+    <>
       <script
         type="application/ld+json"
         suppressHydrationWarning
@@ -76,57 +74,31 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
           }),
         }}
       />
-
-      <div className="mb-6">
-        <nav className="mb-4 flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
-          <Link href="/posts" className="hover:text-blue-600 dark:hover:text-blue-400">
-            포스트
-          </Link>
-          <span>/</span>
-          <Link
-            href={`/categories/${post.category}`}
-            className="capitalize hover:text-blue-600 dark:hover:text-blue-400"
-          >
-            {post.category}
-          </Link>
-          <span>/</span>
-          <span className="text-gray-900 dark:text-gray-100">{post.metadata.title}</span>
-        </nav>
-      </div>
-
-      <div className="flex gap-8">
-        <main className="min-w-0 flex-1">
-          <article className="prose max-w-none">
-            <PostHeader
-              category={post.category}
-              title={post.metadata.title}
-              publishedAt={post.metadata.publishedAt}
-              readingTime={post.readingTime}
-            />
-            {post.series && (
-              <SeriesPosts
-                currentPostSlug={post.slug}
-                seriesPosts={seriesPosts}
-                seriesName={post.series}
-              />
-            )}
-            <PostContent content={post.content} />
-          </article>
-
-          <RelatedPosts currentPost={post} />
-          <Giscus />
-          {post.series && (
-            <SeriesPrevNextNav
-              currentPostSlug={post.slug}
-              seriesPosts={seriesPosts}
-              seriesName={post.series}
-            />
-          )}
-        </main>
-        <div className="hidden xl:block">
-          <TableOfContents />
-        </div>
-      </div>
-    </div>
+      <main className="flex w-full flex-col gap-12 px-7 pb-11">
+        <PostHeader
+          category={post.category}
+          title={post.metadata.title}
+          publishedAt={post.metadata.publishedAt}
+          readingTime={post.readingTime}
+          seriesMeta={seriesMeta ?? null}
+        />
+        {seriesMeta && (
+          <SeriesTableOfContents
+            currentPostSlug={post.slug}
+            seriesPosts={seriesPosts}
+            seriesName={seriesMeta.title}
+          />
+        )}
+        <PostContent content={post.content} />
+        <Giscus />
+        {seriesMeta && (
+          <SeriesPrevNextNav
+            currentPostSlug={post.slug}
+            seriesPosts={seriesPosts}
+            seriesName={seriesMeta.title}
+          />
+        )}
+      </main>
+    </>
   );
 }
