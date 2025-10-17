@@ -6,6 +6,8 @@ import { SearchProvider } from '@/contexts/SearchContext';
 import { generateSearchData } from '@/lib/post';
 import './globals.css';
 import { GoogleAnalytics, GoogleTagManager } from '@next/third-parties/google';
+import { Analytics } from '@vercel/analytics/react';
+import { blogMeta } from '@/data/blogMeta';
 
 const ibmPlexSansKr = IBM_Plex_Sans_KR({
   subsets: ['latin-ext'],
@@ -14,8 +16,22 @@ const ibmPlexSansKr = IBM_Plex_Sans_KR({
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID || '';
 
 export const metadata: Metadata = {
-  title: 'My Blog',
-  description: 'Personal blog built with Next.js',
+  title: blogMeta.title,
+  description: blogMeta.description,
+  authors: [{ name: blogMeta.author }],
+  keywords: blogMeta.keywords,
+  openGraph: {
+    title: blogMeta.title,
+    description: blogMeta.description,
+    url: blogMeta.url,
+    images: blogMeta.image,
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: blogMeta.title,
+    description: blogMeta.description,
+    images: [blogMeta.image],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -35,6 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Footer />
           </div>
         </SearchProvider>
+        <Analytics />
         <GoogleAnalytics gaId={GA_ID} />
         <GoogleTagManager gtmId={GA_ID} />
       </body>

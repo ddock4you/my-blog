@@ -12,7 +12,7 @@ export type SeriesMeta = {
   coverImage?: string; // 시리즈 커버 이미지 경로(선택)
 };
 
-const SERIES_DATA_DIR = path.join(process.cwd(), 'data', 'series');
+const SERIES_DATA_DIR = path.join(process.cwd(), 'src', 'data', 'series');
 
 type SeriesRegistry = Record<string, SeriesMeta>;
 
