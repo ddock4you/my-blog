@@ -10,8 +10,6 @@
 
 /* Tailwind CSS 테마 설정 - CSS 변수들을 정의하여 Tailwind 클래스에서 사용할 수 있게 함 */
 @theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
   --font-ibm: var(--font-ibm-plex-sans-kr);
 
 

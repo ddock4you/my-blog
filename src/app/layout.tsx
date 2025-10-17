@@ -5,13 +5,13 @@ import { Footer } from '@/components/Footer';
 import { SearchProvider } from '@/contexts/SearchContext';
 import { generateSearchData } from '@/lib/post';
 import './globals.css';
+import { GoogleAnalytics, GoogleTagManager } from '@next/third-parties/google';
 
 const ibmPlexSansKr = IBM_Plex_Sans_KR({
-  variable: '--font-ibm-plex-sans-kr',
-  subsets: ['latin'],
-  weight: ['100', '200', '300', '400', '500', '600', '700'],
-  display: 'swap',
+  subsets: ['latin-ext'],
+  weight: ['400', '600', '700'],
 });
+const GA_ID = process.env.NEXT_PUBLIC_GA_ID || '';
 
 export const metadata: Metadata = {
   title: 'My Blog',
@@ -23,7 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const searchData = generateSearchData();
 
   return (
-    <html lang="ko" className={`${ibmPlexSansKr.variable}`}>
+    <html lang="ko" className={ibmPlexSansKr.className}>
       <body
         className="font-ibm bg-bg-inverse-white box-sizing-border-box flex min-h-screen flex-col
           antialiased"
@@ -35,6 +35,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Footer />
           </div>
         </SearchProvider>
+        <GoogleAnalytics gaId={GA_ID} />
+        <GoogleTagManager gtmId={GA_ID} />
       </body>
     </html>
   );

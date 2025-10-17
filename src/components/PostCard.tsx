@@ -14,6 +14,8 @@ function PostCard({ post }: { post: PostWithCategory }) {
           alt={`${post.metadata.title} 썸네일`}
           fill
           className="object-cover"
+          sizes="(max-width: 640px) 640px, 160px"
+          priority={true}
         />
       </p>
       <div className="text-text-primary flex flex-col gap-4 sm:justify-center sm:gap-3">
