@@ -6,7 +6,6 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { slugify } from '@/lib/utils';
 import clsx from 'clsx';
 
 interface SeriesTableOfContentsProps {

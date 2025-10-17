@@ -48,9 +48,9 @@ function loadSeriesRegistryFromDisk(): SeriesRegistry {
       const inSeriesRaw = data.inSeries;
       const allowed = ['완료', '연재중', '중단'] as const;
       const inSeries: '완료' | '연재중' | '중단' =
-        typeof inSeriesRaw === 'string' && allowed.includes(inSeriesRaw as any)
-          ? (inSeriesRaw as any)
-          : undefined;
+        typeof inSeriesRaw === 'string' && allowed.includes(inSeriesRaw as SeriesMeta['inSeries'])
+          ? (inSeriesRaw as SeriesMeta['inSeries'])
+          : '연재중';
       const coverImage: string | undefined =
         typeof data.coverImage === 'string' && data.coverImage.trim() !== ''
           ? String(data.coverImage)

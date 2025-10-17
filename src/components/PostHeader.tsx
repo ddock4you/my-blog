@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { formatDate, formatReadingTime } from '@/lib/utils';
 import { Calendar, Clock } from 'lucide-react';
 import { Badge } from './ui/badge';

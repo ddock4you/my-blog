@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { Search, X, Calendar, BookOpen, Loader2 } from 'lucide-react';
-import { useSearch } from '@/hooks/useSearch';
+import { SearchResult, useSearch } from '@/hooks/useSearch';
 import { formatDate } from '@/lib/utils';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
@@ -218,7 +218,7 @@ function SearchResults({
   highlightMatch,
   onClose,
 }: {
-  searchResults: any[];
+  searchResults: SearchResult[];
   resultCount: number;
   searchQuery: string;
   highlightMatch: (text: string, query: string) => string;
@@ -251,7 +251,7 @@ function SearchResultItem({
   highlightMatch,
   onClose,
 }: {
-  post: any;
+  post: SearchResult;
   searchQuery: string;
   highlightMatch: (text: string, query: string) => string;
   onClose: () => void;

@@ -4,7 +4,6 @@ import React from 'react';
 import { baseUrl } from '@/app/sitemap';
 import { PostContent } from '@/components/PostContent';
 import { PostHeader } from '@/components/PostHeader';
-import { RelatedPosts } from '@/components/RelatedPosts';
 import { SeriesTableOfContents } from '@/components/SeriesTableOfContents';
 import Giscus from '@/components/Giscus';
 import SeriesPrevNextNav from '@/components/SeriesPrevNextNav';

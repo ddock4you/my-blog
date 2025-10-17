@@ -28,7 +28,7 @@ export function TableOfContents() {
 
       // 우선 기존 id 사용, 없거나 공백이면 텍스트 기반으로 생성
       const initialId = (element.id || '').trim();
-      let candidateId = slugify(initialId || baseText) || `section-${idx + 1}`;
+      const candidateId = slugify(initialId || baseText) || `section-${idx + 1}`;
 
       // 중복 방지: 이미 존재하면 -2, -3 ... 접미어 추가
       let uniqueId = candidateId;

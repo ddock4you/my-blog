@@ -5,7 +5,6 @@ import { SeriesInfo } from '@/lib/post';
 import { formatDate } from '@/lib/utils';
 import { Calendar } from 'lucide-react';
 import { Badge } from './ui/badge';
-import clsx from 'clsx';
 
 function SeriesCard({ series }: { series: SeriesInfo }) {
   return (

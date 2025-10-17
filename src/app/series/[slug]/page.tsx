@@ -1,9 +1,5 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getAllSeries, getPostsBySeriesName, type PostWithCategory } from '@/lib/post';
-import { formatDate, formatReadingTime } from '@/lib/utils';
-import { BookOpen, Calendar, Clock, Layers } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { MainListNav } from '@/components/MainListNav';
 import Image from 'next/image';
 import SeriesPostCard from '@/components/SeriesPostCard';
@@ -35,7 +31,6 @@ export default async function SeriesDetailPage({ params }: { params: Promise<{ s
   if (!series) notFound();
 
   const posts = getPostsBySeriesName(series.name);
-  console.log(series.count);
   return (
     <div className="flex w-full flex-col gap-10 px-7 pb-11">
       <script

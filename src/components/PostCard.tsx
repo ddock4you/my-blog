@@ -4,7 +4,6 @@ import Image from 'next/image';
 import { PostWithCategory } from '@/lib/post';
 import { formatDate, formatReadingTime } from '@/lib/utils';
 import { Calendar, Clock } from 'lucide-react';
-import { Badge } from './ui/badge';
 
 function PostCard({ post }: { post: PostWithCategory }) {
   return (

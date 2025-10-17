@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { IBM_Plex_Sans_KR, Geist_Mono } from 'next/font/google';
+import { IBM_Plex_Sans_KR } from 'next/font/google';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { SearchProvider } from '@/contexts/SearchContext';
@@ -11,11 +11,6 @@ const ibmPlexSansKr = IBM_Plex_Sans_KR({
   subsets: ['latin'],
   weight: ['100', '200', '300', '400', '500', '600', '700'],
   display: 'swap',
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
 });
 
 export const metadata: Metadata = {

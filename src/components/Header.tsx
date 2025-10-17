@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect, useCallback, memo } from 'react';
-import { Sun, Moon, Search } from 'lucide-react';
+import { Sun, Moon } from 'lucide-react';
 import { SearchModal } from './SearchModal';
 import { useTheme } from '../hooks/useTheme';
 import clsx from 'clsx';
@@ -13,9 +13,9 @@ export function Header() {
   const [lastScrollY, setLastScrollY] = useState(0);
   const { isDarkMode, toggleDarkMode } = useTheme();
 
-  const openSearch = useCallback(() => {
-    setIsSearchOpen(true);
-  }, []);
+  // const openSearch = useCallback(() => {
+  //   setIsSearchOpen(true);
+  // }, []);
 
   const closeSearch = useCallback(() => {
     setIsSearchOpen(false);
@@ -70,7 +70,7 @@ export function Header() {
         <div className="flex h-full items-center justify-between">
           <Logo />
           <Navigation
-            openSearch={openSearch}
+            // openSearch={openSearch}
             toggleDarkMode={toggleDarkMode}
             isDarkMode={isDarkMode}
           />
@@ -92,11 +92,11 @@ function Logo() {
 }
 
 const Navigation = memo(function Navigation({
-  openSearch,
+  // openSearch,
   toggleDarkMode,
   isDarkMode,
 }: {
-  openSearch: () => void;
+  // openSearch: () => void;
   toggleDarkMode: () => void;
   isDarkMode: boolean;
 }) {
