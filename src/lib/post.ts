@@ -1,13 +1,46 @@
 import fs from 'fs';
 import path from 'path';
+import YAML from 'yaml';
 import { calculateReadingTime, slugify } from './utils';
 import { SERIES_REGISTRY, type SeriesMeta, findSeriesKey, getSeriesOrder } from './series';
 
-const CATEGORY_MAP: { [key: string]: string } = {
-  development: '개발',
-  misc: '기타',
-  setupMigration: '환경설정',
-};
+// Category registry (YAML) loader
+type CategoryRegistryItem = { slug: string; name: string; order?: number };
+type CategoryRegistry = Record<string, { name: string; order?: number }>;
+
+const CATEGORIES_FILE = path.join(process.cwd(), 'src', 'data', 'categories.yaml');
+
+let cachedCategoryRegistry: CategoryRegistry | null = null;
+
+function loadCategoriesRegistryFromDisk(): CategoryRegistry {
+  try {
+    const raw = fs.readFileSync(CATEGORIES_FILE, 'utf-8');
+    const parsed = YAML.parse(raw) || {};
+    const items: CategoryRegistryItem[] = Array.isArray(parsed.categories) ? parsed.categories : [];
+    const map: CategoryRegistry = {};
+    for (const item of items) {
+      if (!item || !item.slug) continue;
+      const slug = String(item.slug).trim();
+      const name = String(item.name ?? slug).trim();
+      const order = typeof item.order === 'number' ? item.order : undefined;
+      map[slug] = { name, order };
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+function getCategoryRegistry(): CategoryRegistry {
+  if (cachedCategoryRegistry) return cachedCategoryRegistry;
+  cachedCategoryRegistry = loadCategoriesRegistryFromDisk();
+  return cachedCategoryRegistry;
+}
+
+function resolveCategoryName(slug: string): string {
+  const registry = getCategoryRegistry();
+  return registry[slug]?.name ?? slug;
+}
 
 type Metadata = {
   title: string;
@@ -15,6 +48,7 @@ type Metadata = {
   summary: string;
   image?: string;
   series?: string;
+  category?: string; // frontmatter에서 읽기(필수). 폴더에서 유도하지 않음
 };
 
 export type PostWithCategory = {
@@ -82,12 +116,10 @@ function getAllMDXFiles(
   basePath: string = ''
 ): Array<{
   file: string;
-  category: string;
   relativePath: string;
 }> {
   const files: Array<{
     file: string;
-    category: string;
     relativePath: string;
   }> = [];
 
@@ -101,11 +133,8 @@ function getAllMDXFiles(
       const nestedFiles = getAllMDXFiles(fullPath, path.join(basePath, item));
       files.push(...nestedFiles);
     } else if (item === 'index.mdx') {
-      const pathParts = basePath.split(path.sep);
-      const category = pathParts[0] || 'uncategorized';
       files.push({
         file: fullPath,
-        category: category,
         relativePath: basePath,
       });
     }
@@ -120,26 +149,49 @@ function readMDXFile(filePath: string) {
 }
 
 export function getBlogPosts(): PostWithCategory[] {
-  const contentsDir = path.join(process.cwd(), 'src', 'contents');
+  const contentsDir = path.join(process.cwd(), 'src', 'contents', 'posts');
   const allFiles = getAllMDXFiles(contentsDir);
 
-  return allFiles.map(({ file, category, relativePath }) => {
+  const posts = allFiles.map(({ file, relativePath }) => {
     const { metadata, content } = readMDXFile(file);
     const slug = path.basename(relativePath);
     const readingTime = calculateReadingTime(content);
+
+    const category = String((metadata as any).category || '').trim();
+    if (!category) {
+      throw new Error(
+        `MDX frontmatter에 category가 누락되었습니다: ${file}. 'category: <slug>'를 추가해주세요.`
+      );
+    }
 
     return {
       metadata,
       slug,
       content,
       category,
-      categoryName: CATEGORY_MAP[category] || category,
+      categoryName: resolveCategoryName(category),
       fullPath: relativePath,
       series: metadata.series,
-      image: metadata.image, // 프론트메타에서 이미지 정보 가져오기
-      readingTime, // 읽기 시간 계산
+      image: metadata.image,
+      readingTime,
     };
   });
+
+  // 전역 slug 유일성 검증
+  const seen = new Map<string, number>();
+  for (const p of posts) {
+    seen.set(p.slug, (seen.get(p.slug) || 0) + 1);
+  }
+  const duplicates = Array.from(seen.entries())
+    .filter(([, count]) => count > 1)
+    .map(([slug]) => slug);
+  if (duplicates.length > 0) {
+    throw new Error(
+      `중복된 slug가 발견되었습니다: ${duplicates.join(', ')}. slug는 전역 유일해야 합니다.`
+    );
+  }
+
+  return posts;
 }
 
 export function getPostsBySeries(category: string, series: string): PostWithCategory[] {
@@ -196,18 +248,30 @@ export function getPostsByCategory(category: string): PostWithCategory[] {
 
 export function getAllCategories(): CategoryInfo[] {
   const allPosts = getBlogPosts();
-  const categoryMap = new Map<string, number>();
+  const countMap = new Map<string, number>();
 
   allPosts.forEach(post => {
-    const count = categoryMap.get(post.category) || 0;
-    categoryMap.set(post.category, count + 1);
+    countMap.set(post.category, (countMap.get(post.category) || 0) + 1);
   });
 
-  return Array.from(categoryMap.entries()).map(([slug, count]) => ({
+  const registry = getCategoryRegistry();
+  const result: CategoryInfo[] = Array.from(countMap.entries()).map(([slug, count]) => ({
     slug,
-    name: CATEGORY_MAP[slug] || slug,
+    name: registry[slug]?.name ?? slug,
     count,
   }));
+
+  // order 우선 정렬, 이후 이름 오름차순
+  result.sort((a, b) => {
+    const ao = registry[a.slug]?.order;
+    const bo = registry[b.slug]?.order;
+    if (typeof ao === 'number' && typeof bo === 'number') return ao - bo;
+    if (typeof ao === 'number') return -1;
+    if (typeof bo === 'number') return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return result;
 }
 
 export function getPostBySlug(category: string, slug: string): PostWithCategory | undefined {
