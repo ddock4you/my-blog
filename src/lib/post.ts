@@ -298,8 +298,9 @@ export function getAllSeries(): SeriesInfo[] {
       (a, b) =>
         new Date(b.metadata.publishedAt).getTime() - new Date(a.metadata.publishedAt).getTime()
     );
-    const first = sorted[0];
-    const last = sorted[sorted.length - 1];
+
+    const first = sorted[sorted.length - 1];
+    const last = sorted[0];
 
     const categories = Array.from(new Set(sorted.map(p => p.category)));
     const categoryNames = Array.from(new Set(sorted.map(p => p.categoryName)));

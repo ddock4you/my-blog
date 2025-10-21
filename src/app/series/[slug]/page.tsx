@@ -5,6 +5,8 @@ import Image from 'next/image';
 import SeriesPostCard from '@/components/SeriesPostCard';
 import SeriesPostList from '@/components/SeriesPostList';
 import { loadSeriesPostInitialData } from '@/server/dataLoaders';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
 export async function generateStaticParams() {
   const seriesList = getAllSeries();
@@ -70,9 +72,7 @@ export default async function SeriesDetailPage({
         }}
       />
       <MainListNav />
-      <section
-        className="bg-bg-inverse-black flex flex-col gap-8 p-10 md:flex-row md:items-end md:gap-9"
-      >
+      <section className="bg-bg-inverse-black flex flex-col gap-8 p-10 md:gap-9">
         <div className="flex flex-col gap-1">
           <h2 className="text-text-inverse-white text-2xl font-bold md:text-3xl">
             {series.meta?.title || series.name}
@@ -81,17 +81,27 @@ export default async function SeriesDetailPage({
             {series.meta?.description || series.firstPostSummary}
           </p>
         </div>
-        <p
-          className="relative ml-auto aspect-square w-full max-w-13 flex-none flex-shrink-0
-            md:max-w-20"
-        >
-          <Image
-            src={series.coverImage ?? ''}
-            alt={series.name}
-            fill
-            className="object-contain md:shadow-md"
-          />
-        </p>
+        <div className="flex items-center justify-between">
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="text-text-inverse-white border-border-inverse-white"
+          >
+            <Link href={`/posts/${series.firstPostSlug}`}>첫 포스트 읽기</Link>
+          </Button>
+          <p
+            className="relative ml-auto aspect-square w-full max-w-13 flex-none flex-shrink-0
+              md:max-w-20"
+          >
+            <Image
+              src={series.coverImage ?? ''}
+              alt={series.name}
+              fill
+              className="object-contain md:shadow-md"
+            />
+          </p>
+        </div>
       </section>
 
       <SeriesPostList
