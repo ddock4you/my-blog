@@ -1,0 +1,192 @@
+---
+title: '윈도우 터미널, Oh My Posh로 전문가처럼 꾸미기'
+publishedAt: '2025-08-21'
+summary: 'PowerShell, Oh My Posh로 나만의 터미널을 꾸미고 생산성을 높여보세요.'
+category: '환경설정'
+image: '/contents/posts/oh-my-posh-setup/images/oh-my-posh-logo.png'
+---
+
+## 들어가며
+
+터미널 환경을 개인의 취향에 맞게 설정하는 것은 개발 생산성을 크게 향상시키는 데 중요한 역할을 합니다. 특히 윈도우 환경에서 `PowerShell`은 강력한 기본 도구이지만, 더 나은 사용성과 시각적인 만족감을 위해 `Oh My Posh`와 같은 도구들을 활용할 수 있습니다.
+
+이 포스트에서는 윈도우 `PowerShell` 환경을 개선하기 위한 세 가지 핵심 도구인 `PowerShell 7`, `Oh My Posh`, 그리고 `PsReadLine`의 설치 및 설정 방법을 상세히 안내합니다. 이 가이드를 통해 여러분만의 효율적이고 아름다운 터미널 환경을 구축하시길 바랍니다.
+
+## 1. PowerShell 7 살펴보기
+
+이제 첫 번째 도구인 `PowerShell 7`에 대해 자세히 살펴보겠습니다. `PowerShell 7`은 기존 윈도우에 기본 설치된 `Windows PowerShell`의 새로운 버전으로, 여러 개선 사항을 포함하고 있습니다. 주요 차이점은 다음과 같습니다.
+
+### 1.1. 기존 (기본 설치된) PowerShell과의 차이점
+
+`PowerShell 7`은 기존 윈도우에 기본 설치된 `Windows PowerShell`의 새로운 버전으로, 단순히 버전 숫자만 올라간 것이 아니라 사용자 경험과 개발 효율성을 크게 개선하는 여러 핵심적인 변화를 가져왔습니다. 이러한 변화는 특히 현대적인 개발 환경에서 더욱 빛을 발합니다. 주요 차이점은 다음과 같습니다.
+
+- **최대 3-5배 빠른 실행 속도**: 스크립트 실행 및 명령 처리 속도가 대폭 향상되었습니다.
+- **병렬 처리 개선**: 여러 작업을 동시에 처리하는 기능이 강화되어 대규모 작업을 효율적으로 수행할 수 있습니다.
+- **메모리 사용량 최적화**: 이전 버전에 비해 메모리 사용량이 줄어들어 시스템 자원을 더욱 효율적으로 사용할 수 있습니다.
+- **크로스 플랫폼 지원**: `PowerShell 7`은 윈도우 외에도 macOS, Linux 등 다양한 운영체제에서 동일하게 사용 가능하도록 설계되었습니다. 이는 개발자가 어떤 운영체제를 사용하더라도 일관된 쉘 환경에서 스크립트를 작성하고 실행할 수 있게 해주며, 특히 윈도우 환경에서 리눅스 기반의 도구들과의 상호 운용성을 높이는 데 크게 기여합니다. 이제 윈도우에서도 리눅스 서버를 관리하거나, 컨테이너 환경에서 작업하는 것이 훨씬 유연해집니다.
+
+### 1.2. 설치 방법
+
+`PowerShell 7`은 `Microsoft Store`를 통해 가장 쉽게 설치할 수 있습니다. 아래 링크를 클릭하여 설치 페이지로 이동하세요.
+
+- [PowerShell - Windows에서 무료 다운로드 및 설치 | Microsoft Store](https://apps.microsoft.com/detail/9mz1snwt0n5d?hl=ko-kr&gl=KR&ocid=pdpshare)
+
+**왜 `Microsoft Store`를 통해 설치를 권장할까요?**
+`Microsoft Store`를 통한 설치는 관리의 용이성, 자동 업데이트, 그리고 안전성 측면에서 많은 이점을 제공합니다. 별도의 설치 파일을 다운로드하여 수동으로 설정할 필요 없이 클릭 몇 번으로 간편하게 설치할 수 있습니다.
+
+**설치 시 유의사항!** `PowerShell 7`은 기존 `Windows PowerShell`과 별개의 프로그램으로 설치됩니다. 윈도우 검색 시 이름이 비슷하여 혼동할 수 있으니, 아래 차이점을 참고하여 정확한 프로그램을 실행하는 것이 중요합니다.
+
+- 기존 파일명: `Windows PowerShell` (기본 설치 버전)
+- `PowerShell 7` 실행 파일명: `PowerShell` (새로 설치하는 버전)
+
+설치 후에는 `PowerShell`을 검색하여 새로운 버전이 잘 설치되었는지 확인해 보세요.
+
+## 2. Oh My Posh 설치 및 테마 설정
+
+다음으로는 터미널의 시각적 요소를 강화하고 개발 생산성을 높여주는 `Oh My Posh`에 대해 알아보겠습니다. `Oh My Posh`는 터미널의 시각적 요소를 아름답게 꾸며주고, `Git` 상태, 현재 경로, 명령어 실행 시간 등 유용한 정보를 프롬프트에 표시해주는 도구입니다. 이를 통해 터미널 사용 경험을 한층 더 향상시킬 수 있습니다.
+
+### 2.1. 윈도우 스토어에서 Oh My Posh 설치
+
+`Oh My Posh`는 `Microsoft Store`를 통해 가장 간편하게 설치할 수 있습니다. `Microsoft Store` 앱을 열고 `Oh My Posh`를 검색하거나, 아래 제공된 링크를 클릭하여 설치 페이지로 직접 이동하세요. `Microsoft Store`를 통해 설치하면 업데이트 관리가 용이하며, 시스템 환경에 대한 별도의 복잡한 설정 없이 바로 사용할 수 있다는 장점이 있습니다.
+
+- [Oh My Posh - Microsoft Apps](https://apps.microsoft.com/detail/XP8K0HKJFRXGCK?hl=ko&gl=KR&ocid=pdpshare)
+
+### 2.2. 폰트 설치 및 적용
+
+`Oh My Posh`는 다양한 아이콘과 심볼을 사용하므로, 이를 올바르게 표시하려면 `Nerd Fonts`(개발 환경에서 특수 기호와 아이콘을 지원하는 폰트) 설치가 필수적입니다. 공식 웹사이트에서 추천하는 폰트를 설치하거나, 원하는 다른 `Nerd Fonts`를 선택할 수 있습니다.
+
+**왜 `Nerd Fonts`를 설치해야 할까요?**
+`Oh My Posh` 테마는 Git 브랜치 아이콘, 운영체제 로고, 심지어 특정 프로그래밍 언어를 나타내는 심볼 등 다양한 특수 문자를 활용하여 프롬프트를 구성합니다. 일반 폰트에서는 이러한 특수 문자들을 제대로 표시하지 못해 '깨짐' 현상이 발생할 수 있습니다. `Nerd Fonts`는 이러한 모든 문자를 포함하고 있어, `Oh My Posh` 테마를 완벽하게 즐기기 위한 필수 요소입니다.
+
+**1. 추천 폰트 설치 (MesloLGS NF)**
+
+`PowerShell`에서 다음 명령어를 입력하여 `MesloLGS NF` 폰트를 설치할 수 있습니다. `MesloLGS NF`는 `Nerd Fonts` 중 가장 널리 사용되고 안정적인 폰트 중 하나로, `Oh My Posh` 테마에서 사용되는 모든 아이콘과 글리프(glyph)를 깨짐 없이 완벽하게 지원합니다.
+
+```shell
+oh-my-posh font install meslo
+```
+
+이 명령어를 실행하면 `Oh My Posh`가 자동으로 `MesloLGS NF` 폰트를 다운로드하고 시스템에 설치해줍니다. 설치 과정에서 몇 가지 질문이 나올 수 있지만, 기본 설정을 유지하고 `Enter`를 눌러 진행하면 됩니다.
+
+**2. 다른 폰트 설치**
+
+만약 다른 `Nerd Fonts`를 설치하고 싶다면, `PowerShell`에서 `oh-my-posh font install`을 입력하여 목록을 확인하거나, `Nerd Fonts` 공식 웹사이트에서 직접 다운로드하여 설치할 수 있습니다.
+
+- [Nerd Fonts - Iconic font aggregator, glyphs/icons collection, & fonts patcher](https://www.nerdfonts.com/font-downloads)
+
+**3. 터미널 프로그램에 폰트 적용**
+
+폰트를 설치했다고 해서 바로 터미널에 적용되는 것은 아닙니다. 사용하고 있는 터미널 프로그램(예: `Windows Terminal`, `VS Code` 터미널 등)의 설정에서 설치한 `Nerd Fonts`를 수동으로 선택해야 합니다.
+
+- `Windows Terminal`의 경우:
+  - 터미널 설정 열기 (Ctrl + , 또는 터미널 상단 탭에서 아래 화살표 클릭 후 '설정')
+  - 왼쪽 프로필 메뉴에서 `PowerShell` 선택
+  - 오른쪽 창에서 '추가 설정 - 모양' 선택
+  - '글꼴' 드롭다운 메뉴에서 설치한 `MesloLGS NF` (또는 선택한 `Nerd Fonts`) 폰트를 선택 후 저장
+
+이제 터미널을 다시 시작하면 새로운 폰트가 적용되어 `Oh My Posh` 테마가 올바르게 표시될 준비가 완료됩니다.
+_(팁: 폰트 변경 사항은 터미널을 완전히 종료했다가 다시 시작해야 제대로 적용되는 경우가 많습니다. 만약 폰트가 제대로 보이지 않는다면 터미널을 완전히 닫았다가 다시 실행해 보세요.)_
+
+### 2.3. 테마 설정
+
+`Oh My Posh`는 다양한 테마를 제공하여 사용자 취향에 맞게 터미널을 꾸밀 수 있습니다. 자신에게 가장 잘 맞는 테마를 찾아 적용해 보세요. 각 테마는 고유한 색상, 아이콘, 정보 표시 방식 등을 가지고 있어 개발자의 개성을 표현하고 작업 효율을 높이는 데 기여합니다. 테마를 통해 Git 브랜치 상태, 현재 작업 디렉토리, 심지어 배터리 잔량과 같은 유용한 정보들을 한눈에 확인할 수 있습니다.
+
+**1. 테마 선택**
+
+`Oh My Posh` 공식 웹사이트에서 제공되는 수많은 테마를 둘러보고, 마음에 드는 테마를 선택하세요. 미리보기 이미지를 통해 각 테마의 디자인과 정보 표시 방식을 확인할 수 있습니다.
+
+- [Themes | Oh My Posh](https://ohmyposh.dev/docs/themes)
+
+_(팁: 공식 웹사이트에서 마음에 드는 테마를 스크린샷으로 찍어 이곳에 삽입하면 독자의 이해를 높일 수 있습니다. 예: `<img src="../public/oh-my-posh-themes.png" width="500px"/>`)_
+
+**2. 테마 적용 (임시)**
+
+선택한 테마를 `PowerShell`에 적용하기 위해 다음 명령어를 사용합니다. `{theme_name}` 부분에 선택한 테마의 정확한 이름을 입력하세요 (예시: `jblab_2021`). 이 명령어를 실행하면 해당 테마의 `.omp.json` 설정 파일을 원격에서 가져와 현재 세션에 적용합니다.
+
+```shell
+oh-my-posh init pwsh --config 'https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/{theme_name}.omp.json' | Invoke-Expression
+
+# 예시: jblab_2021 테마 적용
+oh-my-posh init pwsh --config 'https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/jblab_2021.omp.json' | Invoke-Expression
+```
+
+이 명령어는 현재 `PowerShell` 세션에만 테마를 임시로 적용합니다. 즉, 현재 열려 있는 터미널 창에서만 적용되며, 새로운 터미널을 열 때마다 이 명령어를 다시 실행해야 하는 번거로움이 있습니다. 이러한 불편함을 해소하고 `PowerShell`을 시작할 때마다 자동으로 테마가 적용되도록 하려면 다음 단계에 따라 테마를 영구적으로 적용해야 합니다.
+
+**3. 테마 영구 적용 ($PROFILE 편집)**
+
+`PowerShell`을 시작할 때마다 자동으로 선택한 테마가 적용되도록 하려면, `PowerShell`의 프로필 파일인 `$PROFILE`을 편집해야 합니다. `$PROFILE`은 `PowerShell`이 시작될 때마다 자동으로 실행되는 스크립트 파일입니다. 이를 통해 사용자 환경 설정을 영구적으로 유지할 수 있습니다.
+
+**왜 `$PROFILE`을 편집해야 할까요?**
+`PowerShell`은 시작될 때 특정 스크립트 파일을 실행하여 환경을 설정할 수 있도록 지원합니다. `$PROFILE` 파일은 이러한 시작 스크립트 중 하나로, 여기에 `Oh My Posh` 테마 적용 명령어를 추가하면 `PowerShell`을 열 때마다 자동으로 테마가 로드되어 사용자가 매번 수동으로 명령어를 입력할 필요가 없습니다. 이는 개발 환경 설정의 자동화와 편의성을 크게 높여줍니다.
+
+먼저, 다음 명령어를 실행하여 프로필 파일을 엽니다.
+
+```shell
+notepad $PROFILE
+```
+
+**만약 `$PROFILE` 파일이 존재하지 않는 경우:**
+
+`notepad $PROFILE` 실행 시 "'지정된 경로를 찾을 수 없습니다.'"라는 오류 메시지가 표시될 수 있습니다. 이는 현재 윈도우 사용자에 대한 프로필 파일이 아직 생성되지 않았기 때문입니다. 아래 코드들을 `PowerShell`에서 순서대로 실행하여 프로필 파일을 생성한 후, 다시 `notepad $PROFILE`을 실행해 보세요.
+
+```shell
+if (!(Test-Path -Path $PROFILE)) { New-Item -ItemType File -Path $PROFILE -Force }
+notepad $PROFILE
+```
+
+`$PROFILE` 메모장이 열리면, 다음 내용을 추가하고 저장합니다. `{theme_name}`에는 앞서 선택했던 테마 이름을 입력합니다.
+
+```shell
+oh-my-posh init pwsh --config 'https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/{theme_name}.omp.json' | Invoke-Expression
+```
+
+여기서 `Invoke-Expression`은 문자열로 된 명령어를 실제 `PowerShell` 명령으로 실행시키는 역할을 합니다. 이를 통해 `Oh My Posh` 초기화 명령이 `PowerShell` 시작 시점에 자동으로 실행되어 테마를 로드하게 됩니다.
+
+저장 후 새로운 `PowerShell` 터미널을 열면, 이제 선택한 테마가 자동으로 적용된 것을 확인할 수 있습니다.
+
+## 3. PsReadLine 활용하기
+
+이제 `PowerShell` 환경에서 명령어 입력 효율을 극대화할 수 있는 `PsReadLine` 모듈에 대해 알아보겠습니다. `PsReadLine`은 `PowerShell` 사용 시 명령어를 더욱 편리하고 효율적으로 입력할 수 있도록 돕는 강력한 모듈입니다. `Zsh` 쉘에서 자주 사용되는 `zsh-syntax-highlighting`이나 `zsh-autosuggestions`와 같은 플러그인의 기능을 `PowerShell`에서도 유사하게 경험할 수 있도록 해줍니다.
+
+주요 기능으로는 구문 작성 오류를 시각적으로 표시해주고, 명령어 자동완성 기능을 제공하며, 과거에 입력했던 명령어 히스토리를 쉽게 찾아볼 수 있게 하여 생산성 향상에 크게 기여합니다.
+
+### 3.1. 설치 및 업데이트 방법
+
+`PsReadLine`은 대부분의 `PowerShell` 환경에 기본적으로 설치되어 있지만, 최신 기능을 활용하려면 업데이트가 필요할 수 있습니다. 특히 구문 강조, 자동 완성 등의 기능을 사용하려면 최소 2.2.0 버전 이상이 권장됩니다.
+
+**왜 `PsReadLine`을 업데이트해야 할까요?**
+기존 `PowerShell`에 설치된 `PsReadLine`은 구버전일 가능성이 높습니다. 최신 버전으로 업데이트해야만 더욱 강력해진 구문 강조, 스마트한 자동 완성, 개선된 명령어 기록 관리 등 다양한 신규 기능을 온전히 사용할 수 있습니다. 이는 터미널 사용 경험을 더욱 풍부하고 효율적으로 만들어줍니다.
+
+다음 명령어를 `PowerShell`에서 실행하여 `PsReadLine`을 최신 버전으로 업데이트할 수 있습니다. (작성일 기준으로 2.3.6 버전으로 업데이트됩니다.)
+
+```shell
+Install-Module -Name PSReadLine -AllowClobber -Force
+```
+
+이 명령어는 `PsReadLine` 모듈을 설치하거나 기존 버전을 강제로 덮어씌워 업데이트합니다. (`-AllowClobber`는 이름이 충돌하는 명령어가 있더라도 모듈을 강제로 설치하며, `-Force`는 사용자 확인 없이 설치를 진행합니다.)
+
+### 3.2. 주요 사용 방법
+
+`PsReadLine`이 업데이트되면 다음과 같은 편리한 기능을 활용할 수 있습니다. 특히 `F2` 키를 누르면 `inlineView` 모드와 `ListView` 모드를 번갈아가며 선택할 수 있어 명령어 입력 방식을 자유롭게 전환할 수 있습니다.
+
+#### 1) `inlineView` 모드 (인라인 보기 모드)
+
+이 모드에서는 과거에 입력된 명령어를 기반으로 현재 입력 중인 명령어의 전체 또는 일부를 자동으로 제안해줍니다. 터미널에 명령어를 입력하기 시작하면 이전에 사용했던 유사한 명령어가 회색 텍스트로 나타나며, 제안된 명령어가 마음에 든다면 오른쪽 화살표(`→`) 키를 눌러 손쉽게 명령어를 완성할 수 있습니다. 이는 마치 `Zsh`의 `zsh-autosuggestions` 플러그인처럼 작동하여 반복적인 명령어 입력을 줄이고 빠른 작업을 가능하게 합니다. 특히 길고 복잡한 명령어를 자주 사용하는 개발자에게 매우 유용한 기능입니다. 예를 들어, `git commit -m "feat: add new feature for user authentication"`과 같이 긴 명령어를 일부만 입력해도 전체 명령어를 제안받아 빠르게 완성할 수 있습니다.
+
+_(팁: `inlineView` 모드의 동작을 보여주는 GIF 또는 스크린샷을 이곳에 삽입하면 좋습니다. 예: `<img src="../public/psreadline-inlineview.gif" width="500px"/>`)_
+
+#### 2) `ListView` 모드 (리스트 보기 모드)
+
+`ListView` 모드는 과거에 입력된 명령어들을 입력 영역 아래에 드롭다운 리스트 형태로 보여줍니다. `F2` 키를 눌러 `ListView` 모드로 전환한 후, 아래 화살표(`↓`) 키를 눌러 리스트에 진입하고 위/아래 화살표 키로 원하는 명령어를 선택하고 `Enter`를 눌러 실행할 수 있습니다. 이는 특정 명령어를 정확히 기억하지 못하거나, 이전에 사용했던 여러 명령어 중에서 선택해야 할 때 매우 편리합니다. `Zsh`의 명령어 히스토리 검색 기능과 유사하게, `PsReadLine`은 사용자가 효율적으로 명령어를 재활용할 수 있도록 지원합니다. 예를 들어, 여러 서버에 접속하는 명령어나 복잡한 빌드 스크립트 중 하나를 찾아 실행할 때 유용하게 활용될 수 있습니다.
+
+_(팁: `ListView` 모드의 동작을 보여주는 GIF 또는 스크린샷을 이곳에 삽입하면 좋습니다. 예: `<img src="../public/psreadline-listview.gif" width="500px"/>`)_
+
+`PsReadLine`을 활용하면 `PowerShell` 환경에서도 마치 고급 쉘을 사용하는 듯한 생산성 향상을 경험할 수 있습니다. 이 모듈을 통해 더욱 빠르고 효율적인 터미널 작업을 시작해 보세요. 이제 여러분의 `PowerShell` 터미널이 한층 더 강력해졌을 것입니다.
+
+## 마무리
+
+지금까지 윈도우 `PowerShell` 환경을 더욱 강력하고 시각적으로 매력적으로 만들어 줄 세 가지 핵심 도구, 즉 `PowerShell 7`, `Oh My Posh`, 그리고 `PsReadLine`의 설치 및 설정 방법을 자세히 살펴보았습니다.
+
+`PowerShell 7`로 업그레이드하여 성능과 기능을 향상시키고, `Oh My Posh`를 통해 터미널 프롬프트를 시각적으로 풍부하게 꾸몄습니다. 또한, `PsReadLine`을 활용하여 명령어 입력의 편의성과 효율성을 극대화했습니다. 이 과정에서 폰트 설정, 테마 적용, 프로필 파일 편집 등 세부적인 설정 방법까지 함께 다루었습니다.
+
+이 포스트가 여러분의 개발 환경을 개선하고, 더욱 즐겁고 생산적인 터미널 경험을 선사하는 데 도움이 되었기를 진심으로 바랍니다. 긴 글 읽어주셔서 감사합니다!

@@ -50,22 +50,40 @@ export function TableOfContents() {
 
     setToc(tocItems);
 
-    // 스크롤 이벤트로 현재 섹션 하이라이트
-    const handleScroll = () => {
-      const scrollY = window.scrollY;
-      const headingElements = Array.from(headings);
+    // IntersectionObserver로 현재 섹션 하이라이트
+    const observer = new IntersectionObserver(
+      entries => {
+        const visibleHeadings = entries
+          .filter(entry => entry.isIntersecting)
+          .sort(
+            (a, b) => (a.target as HTMLElement).offsetTop - (b.target as HTMLElement).offsetTop
+          );
 
-      for (let i = headingElements.length - 1; i >= 0; i--) {
-        const element = headingElements[i] as HTMLElement;
-        if (element.offsetTop <= scrollY + 100) {
-          setActiveId(element.id);
-          break;
+        if (visibleHeadings.length > 0) {
+          const current = visibleHeadings[0].target as HTMLElement;
+          setActiveId(current.id);
+        } else {
+          // 교차 중인 요소가 없으면, 가장 위에 가까운 헤딩을 선택
+          const headingElements = Array.from(headings) as HTMLElement[];
+          const scrollY = window.scrollY || 0;
+          for (let i = headingElements.length - 1; i >= 0; i--) {
+            const el = headingElements[i];
+            if (el.offsetTop <= scrollY + 120) {
+              setActiveId(el.id);
+              break;
+            }
+          }
         }
+      },
+      {
+        root: null,
+        rootMargin: '0px 0px -70% 0px',
+        threshold: [0, 1.0],
       }
-    };
+    );
 
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    headings.forEach(h => observer.observe(h));
+    return () => observer.disconnect();
   }, []);
 
   const handleClick = (id: string) => {

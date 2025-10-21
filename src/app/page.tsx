@@ -23,7 +23,7 @@ export default async function Home({ searchParams }: HomeProps) {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-4">
+      <div className="bg-bg-inverse-white sticky top-0 z-50 flex flex-col gap-4 py-4">
         <MainListNav />
         <CategoriesList categories={categories} selectedCategory={category} />
       </div>

@@ -228,14 +228,3 @@ function SearchResults({
     </div>
   );
 }
-
-// 기존 SearchResultItem 컴포넌트는 PostCard로 대체되었습니다.
-
-function SearchFooter() {
-  return (
-    <div
-      className="border-t border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700
-        dark:bg-gray-900"
-    ></div>
-  );
-}

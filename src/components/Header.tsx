@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect, useCallback, memo } from 'react';
+import { useState, useCallback, memo } from 'react';
 import { Sun, Moon, Search } from 'lucide-react';
 import { SearchModal } from './SearchModal';
 import { useTheme } from '@/hooks/useTheme';
@@ -9,8 +9,6 @@ import clsx from 'clsx';
 
 export function Header() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
-  const [lastScrollY, setLastScrollY] = useState(0);
   const { isDarkMode, toggleDarkMode } = useTheme();
 
   const openSearch = useCallback(() => {
@@ -21,50 +19,12 @@ export function Header() {
     setIsSearchOpen(false);
   }, []);
 
-  const handleKeyDown = useCallback((event: KeyboardEvent) => {
-    if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
-      event.preventDefault();
-      setIsSearchOpen(true);
-    }
-  }, []);
-
-  const handleScroll = useCallback(() => {
-    const currentScrollY = window.scrollY;
-
-    // 스크롤이 맨 위에 있을 때는 항상 헤더를 보여줌
-    if (currentScrollY < 10) {
-      setIsHeaderVisible(true);
-    } else {
-      // 스크롤 방향에 따라 헤더 가시성 결정
-      if (currentScrollY > lastScrollY && currentScrollY > 100) {
-        // 아래로 스크롤할 때 헤더 숨김
-        setIsHeaderVisible(false);
-      } else if (currentScrollY < lastScrollY) {
-        // 위로 스크롤할 때 헤더 보임
-        setIsHeaderVisible(true);
-      }
-    }
-
-    setLastScrollY(currentScrollY);
-  }, [lastScrollY]);
-
-  useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
-
-  useEffect(() => {
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [handleScroll]);
-
   return (
     <>
       <header
         className={clsx(
-          `bg-bg-inverse-white sticky top-0 z-50 w-full px-7 py-6 transition-transform duration-300
-          ease-in-out md:px-10 md:py-12`,
-          isHeaderVisible ? 'translate-y-0' : '-translate-y-full'
+          `bg-bg-inverse-white w-full px-7 py-6 pb-2 transition-transform duration-300 ease-in-out
+          md:px-10 md:py-12`
         )}
       >
         <div className="flex h-full items-center justify-between">

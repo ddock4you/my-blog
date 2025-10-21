@@ -1,0 +1,370 @@
+---
+title: '의존성 가볍게 - Effect 재설계로 재실행 줄이기 (기본 전략)'
+publishedAt: '2025-08-30'
+summary: 'Effect 재설계(기본): 파생값 계산·useMemo로 의존성 경량화'
+category: '개발'
+series: 'reactDocs'
+image: '/contents/posts/series/reactDocs/images/react-logo.svg'
+---
+
+## 들어가며
+
+이전 편들 (`5-5편`에서는 `useEffect`의 생명주기와 의존성, 그리고 `5-6편`에서는 이벤트 핸들러와 `Effect`의 역할 분리를 살펴보았습니다. 우리는 `useEffect`가 컴포넌트와 외부 시스템을 동기화하는 강력한 도구임을 배웠고, 의존성 배열이 `Effect`의 실행 시점을 제어하는 핵심적인 메커니즘이라는 것을 이해할 수 있었습니다.
+
+하지만 의존성 배열에 불필요한 값들이 포함되거나, 참조 동등성이 보장되지 않는 객체나 함수가 들어갈 경우, `Effect`가 실제로는 필요 없는 시점에 너무 자주 재실행되어 애플리케이션의 성능 저하를 유발하거나 예상치 못한 버그를 발생시킬 가능성이 있습니다.
+
+이번 편에서는 **이미 사용 중인 `Effect`의 의존성 배열을 능동적으로 '재설계'하여 `Effect` 재실행을 최소화하고 컴포넌트의 안정성을 높이는 구체적인 전략들**을 탐구해보고자 합니다. 이는 `Effect` 자체를 제거하는 것을 넘어, 현재 우리 컴포넌트에서 동작하고 있는 `Effect`를 더욱 견고하고 효율적으로 만드는 데 중점을 둡니다.
+
+## Effect 의존성 재설계 전략: 불필요한 재실행 줄이기
+
+`useEffect`의 의존성 배열을 최적화하는 것은 컴포넌트의 불필요한 렌더링을 줄이고, `Effect`가 실행되어야 할 '진정한' 시점에만 동작하도록 만드는 데 필수적인 과정이라고 생각합니다. 다음은 `Effect`의 의존성을 가볍게 만들고 재실행을 줄이기 위한 몇 가지 전략입니다.
+
+## 1. 렌더링 로직에서 파생 값 계산으로 의존성 제거
+
+`Effect`의 의존성 배열에 포함된 값들은 해당 값이 변경될 때마다 `Effect`를 다시 실행시키는 원인이 됩니다. 때로는 이 의존성 중 컴포넌트의 렌더링 로직에서 쉽게 파생될 수 있는 값이 포함될 수 있습니다. 이러한 파생 값을 `Effect` 의존성에서 제거하면 `Effect`의 불필요한 재실행을 줄일 수 있습니다.
+
+여기서는 이름, 성(姓)으로부터 `fullName`을 파생하여 `Effect` 외부에서 관리하고, `Effect`는 실제로 필요한 `firstName`, `lastName`에만 의존하도록 변경합니다.
+
+> 💡 포스트에선 핵심 코드만 보여주고 있으며, 전체 코드는 아래 링크에서 확인할 수 있습니다.
+
+[Gist 링크 입력](https://gist.github.com/ddock4you/6e19d402317a7173c2662e3de3ff05f2)
+
+### 1-1. Effect 내부에서 파생 값 계산: 책임 범위 확장
+
+다음은 `firstName`과 `lastName`을 사용하여 `Effect` 내부에서 `fullName`을 구성하고 로그하는 예시입니다. 이 접근 방식 자체는 기능적으로 문제가 없지만, `Effect`의 주된 목적인 **외부 시스템과의 동기화**를 넘어 컴포넌트 내부에서 파생 값을 계산하는 역할까지 포함하게 됩니다. 이는 `Effect`의 책임 범위를 모호하게 만들고, `Effect`가 너무 많은 일을 하게 되어 가독성 및 유지보수성을 저해할 수 있습니다. `fullName`이 렌더링 로직에서 충분히 계산될 수 있는 값이라면, `Effect` 내부에서 이를 처리하는 것은 `Effect`의 순수 동기화 역할에 집중하는 것을 방해할 수 있습니다.
+
+```jsx
+import { useEffect } from "react";
+
+function UserProfileBad({ firstName, lastName }) {
+  useEffect(() => {
+    const fullName = `${firstName} ${lastName}`;
+    console.log(`Effect 1 (Effect 내부에서 파생 값 계산): 사용자 이름이 업데이트되었습니다: ${fullName}`);
+  }, [firstName, lastName]);
+
+  return (
+    // ... (생략) ...
+  );
+}
+```
+
+### 1-2. 올바른 접근: 렌더링 로직에서 파생 값 계산
+
+`fullName`과 같은 파생 값을 `Effect` 외부, 즉 컴포넌트의 렌더링 로직 안에서 미리 계산하면, `Effect`의 의존성 배열에서 `fullName` 자체를 제외할 수 있습니다. 이렇게 하면 `Effect`는 `fullName`이 아닌, `fullName`을 구성하는 원시 값들(예: `firstName`, `lastName`)에만 의존하게 되어 더 명확하고 효율적인 의존성 관리가 가능해집니다.
+
+```jsx
+import { useEffect } from "react";
+
+function UserProfileGood({ firstName, lastName }) {
+  const fullName = `${firstName} ${lastName}`; // 렌더링 로직에서 파생 값 계산
+
+  useEffect(() => {
+    console.log(`Effect 2 (올바른 접근): 사용자 이름이 업데이트되었습니다: ${fullName}`);
+  }, [fullName]); // fullName을 의존성으로 포함하더라도, 위에서 계산되므로 Effect 실행 조건을 명확히 합니다.
+
+  return (
+    // ... (생략) ...
+  );
+}
+```
+
+### 1-3. 더 나은 올바른 접근: Effect가 실제로 의존하는 값만 포함
+
+가장 바람직한 접근은 `Effect`가 실제로 필요로 하는 '원시 값'들만 의존성 배열에 명시적으로 넣어주는 것입니다. `fullName`이 `firstName`과 `lastName`으로부터 파생되는 값이라면, `Effect`는 `firstName` 또는 `lastName`이 변경될 때만 재실행되어야 합니다. 이렇게 함으로써 `Effect`의 재실행 조건을 가장 정확하게 제어하고 불필요한 연산을 방지할 수 있습니다.
+
+```jsx
+import { useEffect } from "react";
+
+function UserProfileBetter({ firstName, lastName }) {
+  useEffect(() => {
+    // fullName을 의존성으로 직접 넣기보다, fullName을 구성하는 원시 값에 의존하는 것이 더 명확하고 효율적입니다.
+    console.log(`Effect 3 (더 나은 올바른 접근): 사용자 이름이 업데이트되었습니다: ${firstName} ${lastName}`);
+  }, [firstName, lastName]); // Effect는 firstName, lastName 변경에만 의존합니다.
+
+  return (
+    // ... (생략) ...
+  );
+}
+```
+
+---
+
+이 세 가지 `UserProfile` 예시 컴포넌트들을 모두 렌더링하여 비교해 볼 수 있도록 `App` 컴포넌트를 구성합니다.
+
+```jsx
+import { useState, useEffect } from 'react';
+import UserProfileBad from './codesandbox-examples/section1/UserProfileBad';
+import UserProfileGood from './codesandbox-examples/section1/UserProfileGood';
+import UserProfileBetter from './codesandbox-examples/section1/UserProfileBetter';
+
+export default function App() {
+  const [user, setUser] = useState({ firstName: '김', lastName: '리액트' });
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      // user 객체 내부 값은 변경되지만, 객체 참조는 동일하게 유지
+      // 이 경우, UserProfileBad는 재실행되지 않음 (의존성이 원시값인 firstName, lastName이므로)
+      // UserProfileGood도 재실행되지 않음 (fullName이 firstName, lastName에 의해 파생되고, App의 user state 변경이 fullName을 직접 변경하지 않음)
+      // UserProfileBetter도 재실행되지 않음
+      setUser({ firstName: '박', lastName: '훅스' });
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <div>
+      <h1>파생 값 계산으로 Effect 의존성 제거</h1>
+      <h2>1-1. Effect 내부에서 파생 값 계산</h2>
+      <UserProfileBad firstName={user.firstName} lastName={user.lastName} />
+      <hr style={{ margin: '20px 0' }} />
+      <h2>1-2. 올바른 접근</h2>
+      <UserProfileGood firstName={user.firstName} lastName={user.lastName} />
+      <hr style={{ margin: '20px 0' }} />
+      <h2>1-3. 더 나은 올바른 접근</h2>
+      <UserProfileBetter firstName={user.firstName} lastName={user.lastName} />
+    </div>
+  );
+}
+```
+
+위 코드에서 `UserProfileBad`는 `firstName`과 `lastName`이 변경될 때마다 `Effect`를 실행합니다. 그러나 `UserProfileGood`와 `UserProfileBetter`는 `fullName`을 렌더링 스코프에서 계산하거나, `firstName`, `lastName` 자체를 의존성으로 가져가면서 `Effect`의 재실행을 더욱 정확하고 효율적으로 제어합니다. 특히 `UserProfileBetter`처럼 `Effect`가 실제로 의존하는 '원시 값'들을 명시적으로 넣어주는 것이 가장 바람직하다고 생각합니다.
+
+## 2. 이벤트 전용 로직은 이벤트 핸들러로 이동하여 `Effect` 의존성에서 제거
+
+`Effect`는 주로 렌더링과 동기화되지 않는 외부 시스템과의 상호작용(구독 설정, 데이터 가져오기, DOM 직접 조작 등)에 사용되어야 합니다. 사용자의 특정 행동(클릭, 입력 등)에 반응하는 이벤트성 로직은 `Effect`가 아닌 이벤트 핸들러 내에서 직접 처리하는 것이 좋습니다. 이를 통해 `Effect`의 의존성을 줄이고 예측 가능성을 높일 수 있습니다.
+
+여기서는 '저장' 버튼 클릭 시 데이터를 저장하는 로직을 `Effect`에서 이벤트 핸들러로 옮겨 `Effect`의 불필요한 재실행을 방지합니다.
+
+> 💡 포스트에선 핵심 코드만 보여주고 있으며, 전체 코드는 아래 링크에서 확인할 수 있습니다.
+
+[Gist 링크 입력](https://gist.github.com/ddock4you/60909f13157d956c578a7c8d59798e77)
+
+### 2-1. 잘못된 접근: 이벤트 로직을 `Effect`로 트리거하는 패턴
+
+`BadSaveExample` 컴포넌트는 `triggerSave`라는 상태를 통해 `Effect`를 트리거하는 잘못된 패턴입니다. `Effect`의 본래 목적은 컴포넌트와 외부 시스템을 동기화하는 것이지만, 여기서는 단순히 '액션'을 위한 상태를 만들고 불필요한 렌더링을 유발할 수 있습니다.
+
+```jsx
+import { useState, useEffect } from 'react';
+
+function BadSaveExample() {
+  const [inputValue, setInputValue] = useState('');
+  const [hasChanges, setHasChanges] = useState(false);
+  const [triggerSave, setTriggerSave] = useState(false);
+
+  useEffect(() => {
+    if (triggerSave) {
+      console.log('Effect 내부: 데이터 저장 로직 실행');
+      setTimeout(() => {
+        alert('데이터 저장 완료! (Effect 내부)');
+        setHasChanges(false);
+        setTriggerSave(false);
+      }, 700);
+    }
+  }, [triggerSave]);
+
+  const handleInputChange = e => {
+    setInputValue(e.target.value);
+    setHasChanges(true);
+  };
+
+  const handleSaveButtonClick = () => {
+    if (hasChanges) {
+      setTriggerSave(true);
+    } else {
+      alert('변경사항이 없습니다.');
+    }
+  };
+
+  return (
+    <div>
+      <h3>이벤트 로직을 Effect로 트리거하는 잘못된 패턴</h3>
+      <input type="text" value={inputValue} onChange={handleInputChange} />
+      <p>변경사항: {hasChanges ? '있음' : '없음'}</p>
+      <button onClick={handleSaveButtonClick} disabled={!hasChanges}>
+        저장 (잘못된 Event/Effect 분리)
+      </button>
+    </div>
+  );
+}
+```
+
+### 2-2. 올바른 접근: 이벤트 핸들러 내에서 직접 Side Effect 처리
+
+`GoodSaveExample` 컴포넌트는 `handleSave` 이벤트 핸들러 내에서 직접 비동기 저장 로직을 수행합니다. 이렇게 하면 `Effect`의 의존성 배열을 더욱 간결하게 유지하고, `Effect`의 책임 영역을 '외부 시스템과의 동기화'로 명확히 분리할 수 있습니다. `isSaving` 상태는 오직 UI 피드백을 위한 용도로만 사용되며, `Effect`의 재실행을 트리거하지 않습니다.
+
+```jsx
+import { useState } from 'react';
+
+function GoodSaveExample() {
+  const [inputValue, setInputValue] = useState('');
+  const [hasChanges, setHasChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleInputChange = e => {
+    setInputValue(e.target.value);
+    setHasChanges(true);
+  };
+
+  const handleSave = async () => {
+    if (!hasChanges || isSaving) return;
+
+    setIsSaving(true);
+    console.log('Event Handler 내부: 데이터 저장 로직 실행');
+    try {
+      await new Promise(resolve => setTimeout(resolve, 700));
+      alert('데이터 저장 완료! (Event Handler 내부)');
+      setHasChanges(false);
+    } catch (error) {
+      console.error('저장 실패:', error);
+      alert('데이터 저장 실패!');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div>
+      <h3>이벤트 핸들러 내에서 직접 Side Effect 처리하는 올바른 패턴</h3>
+      <input type="text" value={inputValue} onChange={handleInputChange} />
+      <p>변경사항: {hasChanges ? '있음' : '없음'}</p>
+      <button onClick={handleSave} disabled={!hasChanges || isSaving}>
+        {isSaving ? '저장 중...' : '저장 (올바른 Event 처리)'}
+      </button>
+    </div>
+  );
+}
+```
+
+---
+
+이 두 가지 저장 예시 컴포넌트들을 모두 렌더링하여 비교해 볼 수 있도록 `App` 컴포넌트를 구성합니다.
+
+```jsx
+import { useState } from 'react';
+import BadSaveExample from './codesandbox-examples/section2/BadSaveExample';
+import GoodSaveExample from './codesandbox-examples/section2/GoodSaveExample';
+
+export default function App() {
+  return (
+    <div>
+      <h1>이벤트 로직 분리를 통한 Effect 의존성 최적화</h1>
+      <h2>2-1. 잘못된 접근</h2>
+      <BadSaveExample />
+      <hr style={{ margin: '40px 0' }} />
+      <h2>2-2. 올바른 접근</h2>
+      <GoodSaveExample />
+    </div>
+  );
+}
+```
+
+위 예시에서 `BadSaveExample`은 `triggerSave`라는 상태를 통해 `Effect`를 트리거하는 잘못된 패턴입니다. 이는 `Effect`의 본래 목적과 다르게 '액션'을 위한 상태를 만들고, 불필요한 렌더링을 유발할 수 있습니다. 반면 `GoodSaveExample`은 `handleSave` 이벤트 핸들러 내에서 직접 비동기 저장 로직을 수행하여 `Effect`의 의존성 배열을 더욱 간결하게 유지하고, `Effect`의 책임 영역을 명확히 분리합니다. `isSaving` 상태는 오직 UI 피드백을 위한 용도로만 사용됩니다.
+
+## 3. 객체/배열 의존성 안정화: `useMemo`로 불필요한 `Effect` 재실행 방지
+
+JavaScript에서 객체나 배열은 참조 타입이기 때문에, 내용이 동일하더라도 매 렌더링마다 새로운 객체/배열이 생성되면 `Effect`의 의존성 배열에 있을 때 불필요한 재실행을 유발합니다. `useMemo` 훅을 사용하면 이러한 객체/배열의 참조 동일성을 유지하여 `Effect`의 재실행을 최적화할 수 있습니다.
+
+여기서는 제품 필터링 정보를 담은 `filters` 객체가 매 렌더링마다 새로 생성되어 `Effect`를 불필요하게 재실행시키는 문제를 `useMemo`로 해결합니다.
+
+> 💡 포스트에선 핵심 코드만 보여주고 있으며, 전체 코드는 아래 링크에서 확인할 수 있습니다.
+
+[Gist 링크 입력](https://gist.github.com/ddock4you/02905c8b4c4fdbc2b08f283fd2df6ff6)
+
+### 3-1. 잘못된 접근: 객체 의존성 불안정
+
+다음 `ProductListBad` 컴포넌트에서는 `category`와 `sortBy` 상태를 사용하여 `filters` 객체를 생성하고, 이 `filters` 객체를 `Effect`의 의존성으로 사용합니다. 하지만 `filters` 객체는 매 렌더링마다 새로운 참조를 가지게 되어, `category`나 `sortBy`가 실제로 변경되지 않아도 `Effect`가 불필요하게 재실행될 수 있습니다. 이는 특히 복잡한 필터링 로직이나 API 호출이 동반될 때 성능 저하를 초래할 수 있습니다.
+
+```jsx
+import { useState, useEffect } from "react";
+
+function ProductListBad({ category, sortBy }) {
+  const [products, setProducts] = useState([]);
+
+  const filters = { category, sortBy }; // 매 렌더링마다 새로운 객체 생성
+
+  useEffect(() => {
+    console.log(
+      "Effect 1 (잘못된 접근): 제품 목록을 불러옵니다. (filters 객체 변경)",
+      filters
+    );
+    // ... (생략: 가상의 API 호출 및 제품 목록 업데이트)
+  }, [filters]); // 매 렌더링마다 새로운 filters 객체 때문에 Effect 재실행
+
+  return (
+    // ... (생략) ...
+  );
+}
+```
+
+### 3-2. 올바른 접근: `useMemo`로 객체 의존성 안정화
+
+`ProductListGood` 컴포넌트에서는 `useMemo` 훅을 사용하여 `filters` 객체를 메모이징합니다. `useMemo`는 `category` 또는 `sortBy` 값이 변경될 때만 새로운 `filters` 객체를 생성하도록 하여, `filters` 객체의 참조 동일성을 유지시킵니다. 이로 인해 `Effect`는 `category`나 `sortBy`가 실제로 변경될 때만 재실행되어 불필요한 API 호출이나 값비싼 연산을 방지할 수 있습니다. `useMemo`의 의존성 배열에 `category`와 `sortBy`를 포함함으로써 `filters` 객체가 필요한 시점에만 업데이트되도록 합니다.
+
+```jsx
+import { useState, useEffect, useMemo } from "react";
+
+function ProductListGood({ category, sortBy }) {
+  const [products, setProducts] = useState([]);
+
+  const filters = useMemo(() => ({
+    category,
+    sortBy,
+  }), [category, sortBy]); // useMemo를 사용하여 filters 객체의 참조 동일성을 유지
+
+  useEffect(() => {
+    console.log(
+      "Effect 2 (올바른 접근): 제품 목록을 불러옵니다. (filters 객체 안정화)",
+      filters
+    );
+    // ... (생략: 가상의 API 호출 및 제품 목록 업데이트)
+  }, [filters]); // filters가 useMemo로 안정화되었으므로 불필요한 재실행 방지
+
+  return (
+    // ... (생략) ...
+  );
+}
+```
+
+---
+
+이 두 가지 제품 목록 예시 컴포넌트들을 모두 렌더링하여 비교해 볼 수 있도록 `App` 컴포넌트를 구성합니다.
+
+```jsx
+import { useState } from "react";
+import ProductListBad from "./codesandbox-examples/section3/ProductListBad";
+import ProductListGood from "./codesandbox-examples/section3/ProductListGood";
+
+export default function App() {
+  // ... (생략) ...
+
+  return (
+    // ... (생략) ...
+  );
+}
+```
+
+`ProductListBad`에서는 `filters` 객체가 매 렌더링마다 새로운 참조를 생성하여 `Effect`가 불필요하게 재실행됩니다. 반면, `ProductListGood`에서는 `useMemo`를 사용하여 `filters` 객체의 참조 동일성을 유지함으로써, `Effect`가 `category`나 `sortBy`가 실제로 변경될 때만 실행되도록 최적화합니다. 이는 복잡한 객체나 배열을 `Effect`의 의존성으로 사용할 때 매우 중요한 성능 최적화 기법입니다.
+
+## Effect 의존성 재설계의 특징
+
+### 1. '데이터 흐름' 중심의 사고
+
+React의 `Effect`는 '데이터 흐름'에 반응하여 동작합니다. 즉, 컴포넌트의 렌더링을 유발하는 상태(state)나 속성(props)의 변화가 `Effect`의 재실행을 결정합니다. 따라서 `Effect` 의존성을 가볍게 한다는 것은, `Effect`가 실제로 의존해야 하는 '최소한의 변경 가능한 데이터'만을 의존성 배열에 포함시키는 것을 의미합니다. 이는 불필요한 재실행을 줄여 성능을 최적화하고, `Effect`의 예측 가능성을 높이는 핵심 원칙입니다.
+
+### 2. '동기화' 역할의 명확화
+
+`Effect`는 컴포넌트 외부 시스템(DOM, 네트워크 요청, 구독 등)과의 동기화를 목적으로 합니다. 의존성 배열을 신중하게 관리함으로써, `Effect`가 본래의 동기화 역할에만 충실하도록 만들 수 있습니다. 즉, '언제 동기화 로직을 다시 실행해야 하는가'에 대한 명확한 기준을 제시하는 것이 의존성 관리의 본질입니다. 불필요한 의존성을 제거하면 `Effect`가 예상치 못한 시점에 재실행되는 것을 방지하고, 사이드 이펙트 로직의 실행을 더욱 정확하게 제어할 수 있습니다.
+
+## 요약
+
+이번 포스트에서는 React `Effect`의 의존성을 가볍게 관리하여 불필요한 재실행을 줄이는 기본 전략을 살펴보았습니다. 핵심은 `Effect`가 '진정으로 의존해야 하는' 값만을 의존성 배열에 포함시키고, 그렇지 않은 값들은 다른 방법으로 처리하는 것입니다.
+
+1. **파생 값은 렌더링 로직에서 계산**: 렌더링 로직 내에서 파생 값을 계산하여 `Effect` 의존성에서 안전하게 제거합니다.
+2. **이벤트 핸들러로 로직 분리**: 사용자 인터랙션(`Event`) 로직은 `Effect` 대신 이벤트 핸들러에서 직접 처리하여 `Effect`의 의존성 배열을 간결하게 유지합니다.
+3. **객체/배열 의존성 안정화 (`useMemo`)**: 매 렌더링마다 새로운 참조를 생성하는 객체나 배열을 `Effect` 의존성으로 사용해야 할 경우, `useMemo`를 사용하여 해당 객체/배열의 참조 동일성을 안정화하여 불필요한 `Effect` 재실행을 방지합니다.
+
+이러한 전략들을 통해 여러분의 React 애플리케이션에서 `Effect`의 불필요한 재실행을 효과적으로 줄이고, 더욱 예측 가능하며 효율적인 컴포넌트 로직을 구현할 수 있기를 바랍니다.
+
+## 참고문서
+
+– [[Effect의 의존성 제거하기 (Removing Effect Dependencies)](https://ko.react.dev/learn/removing-effect-dependencies)]

@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
 import { calculateReadingTime, slugify } from './utils';
+// cache 제거: 원래 동작으로 복원
 import {
   SERIES_REGISTRY,
   type SeriesMeta,

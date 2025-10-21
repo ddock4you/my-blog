@@ -1,6 +1,6 @@
 title: '리액트 공식문서 기반의 리액트 입문기'
 description: '바닐라 자바스크립트 개발자의 리액트 입문기 – 공식 문서로 따라가는 비교 학습 여정'
-coverImage: '/react-logo.png'
+coverImage: '/contents/posts/series/reactDocs/images/react-logo.svg'
 order:
   - 1_js-react-counter-diff
   - 2_react-dev-env-nextjs-vite
@@ -12,6 +12,28 @@ order:
   - 8_keeping-components-pure
   - 9_understanding-your-ui-as-a-tree
   - 10_importing-and-exporting-components
+  - 11_responding-to-events
+  - 12_state-a-components-memory
+  - 13_render-and-commit
+  - 14_state-as-a-snapshot
+  - 15_queueing-series-of-state-updates
+  - 16_updating-objects-in-state
+  - 17_updating-arrays-in-state
+  - 18_choosing-the-state-structure
+  - 19_sharing-state-between-components
+  - 20_extracting-state-logic-into-a-reducer
+  - 21_migrating-from-useState-to-useReducer
+  - 22_passing-data-deeply-with-context
+  - 23_scaling-up-with-reducer-and-context
+  - 24_referencing-values-with-refs
+  - 25_manipulating-the-dom-with-refs
+  - 26_synchronizing-with-effects
+  - 27_you-might-not-need-an-effect
+  - 28_lifecycle-of-reactive-effects
+  - 29_separating-events-from-effects
+  - 30_removing-effect-dependencies-basic
+  - 31_removing-effect-dependencies-advanced
+  - 32_reusing-logic-with-custom-hooks
 aliases:
   - React Docs
-inSeries: '연재중'
+inSeries: '완료'

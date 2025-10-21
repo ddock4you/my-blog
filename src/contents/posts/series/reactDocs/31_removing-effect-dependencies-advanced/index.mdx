@@ -1,0 +1,319 @@
+---
+title: 'Effect 재실행 줄이기 (심화 전략)'
+publishedAt: '2025-08-31'
+summary: 'Effect 재설계(심화): 의존성 분해·ref·분리로 재실행 절감'
+category: '개발'
+series: 'reactDocs'
+image: '/contents/posts/series/reactDocs/images/react-logo.svg'
+---
+
+## 들어가며
+
+이전 `5-7편`에서는 `Effect` 의존성을 가볍게 관리하기 위한 기본 전략들을 살펴보았습니다. 렌더링 로직에서 파생 값을 계산하거나, 이벤트 전용 로직을 이벤트 핸들러로 분리하고, `useMemo`를 사용하여 객체/배열 의존성을 안정화하는 방법을 배웠습니다. 이러한 기본 전략들은 `Effect`의 불필요한 재실행을 줄이고 컴포넌트의 효율성을 높이는 데 중요한 역할을 합니다.
+
+이번 `5-8편`에서는 더욱 복잡한 시나리오에서 `Effect`의 재실행을 최적화하고 안정성을 확보하기 위한 심화 전략들을 탐구합니다. 의존성을 분해하거나 `useRef`를 활용하여 `Effect`가 실제로 의존하는 값만 포함시키는 방법, 그리고 `Effect` 자체를 관심사별로 분리하는 방법까지, `Effect` 재설계의 깊이 있는 기법들을 다룰 것입니다. 이 전략들을 통해 여러분의 React 애플리케이션을 더욱 견고하고 성능 좋은 상태로 만들 수 있을 것입니다.
+
+## Effect 의존성 재설계 전략: 불필요한 재실행 줄이기
+
+`useEffect`의 의존성 배열을 최적화하는 것은 컴포넌트의 불필요한 렌더링을 줄이고, `Effect`가 실행되어야 할 '진정한' 시점에만 동작하도록 만드는 데 필수적인 과정이라고 생각합니다. 다음은 `Effect`의 의존성을 가볍게 만들고 재실행을 줄이기 위한 몇 가지 전략입니다.
+
+## 4. 의존성 분해 또는 `ref` 활용: `Effect`가 실제로 의존하는 값만 포함
+
+`Effect`의 의존성 배열에는 `Effect` 로직이 '정말 필요로 하는' 값만 포함해야 합니다. 때로는 여러 값에 의존하는 것처럼 보이지만, 실제로는 그 중 일부만이 `Effect`의 재실행을 유발해야 하는 경우가 있습니다. 이럴 때는 의존성을 분해하거나 `useRef`를 사용하여 불필요한 의존성으로 인한 재실행을 방지할 수 있습니다.
+
+여기서는 `userId`와 `theme`이라는 두 가지 값에 의존하여 사용자 데이터를 가져오는 시나리오를 통해, `Effect`가 실제로 `userId`에만 반응하고 `theme`은 `Effect` 내부에서 최신 값을 읽도록 최적화하는 방법을 보여줍니다.
+
+> 💡 포스트에선 핵심 코드만 보여주고 있으며, 전체 코드는 아래 링크에서 확인할 수 있습니다.
+
+[Gist 링크 입력](https://gist.github.com/ddock4you/4e57ad3dc5ecbb28a053831337686765)
+
+### 4-1. 잘못된 접근: `Effect`가 필요 없는 의존성을 포함
+
+`UserDataFetcherBad` 컴포넌트에서는 `userId`와 `theme`이라는 두 가지 prop을 받아 사용자 데이터를 불러옵니다. `Effect`는 `userId`와 `theme`을 모두 의존성 배열에 포함하고 있는데, 만약 데이터 '불러오기' 로직 자체가 `theme`의 변경에 직접적으로 반응할 필요가 없다면, `theme`을 의존성에 포함하는 것은 불필요한 데이터 재요청을 유발할 수 있습니다. `theme`은 단순히 UI에 표시되는 정보일 뿐, 데이터 페치의 조건이 아닌 경우에 해당합니다.
+
+```jsx
+import { useState, useEffect } from "react";
+
+function UserDataFetcherBad({ userId, theme }) {
+  const [userData, setUserData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // theme 변경 시에도 데이터를 다시 불러오게 되어 불필요한 Effect 재실행 발생
+    console.log(
+      `Effect 1 (잘못된 접근): 사용자 ${userId}의 데이터를 테마 ${theme}으로 불러옵니다.`
+    );
+    // ... (생략: API 호출 및 데이터 업데이트)
+  }, [userId, theme]); // theme이 변경될 때마다 Effect 재실행
+
+  return (
+    // ... (생략) ...
+  );
+}
+```
+
+### 4-2. 올바른 접근 1: 객체 의존성 분해 (특정 값만 반응)
+
+`UserDataFetcherGood1WithDestructuring` 컴포넌트는 `user` 객체 전체를 prop으로 받는 대신, `Effect`가 실제로 의존하는 `user.id`와 같은 특정 원시 값만 의존성 배열에 포함합니다. 이렇게 하면 `user` 객체의 다른 속성(`user.name` 등)이 변경되더라도 `user.id`가 변하지 않으면 `Effect`는 재실행되지 않습니다. 이는 객체의 참조 동일성 문제로 인한 불필요한 `Effect` 재실행을 방지하고, `Effect`가 최소한의 필요한 변경에만 반응하도록 하여 효율성을 높입니다.
+
+```jsx
+import { useState, useEffect } from "react";
+
+function UserDataFetcherGood1WithDestructuring({ user }) {
+  const [userData, setUserData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // user 객체 전체가 아닌 user.id 값에만 의존하여 Effect 재실행을 제어합니다.
+    console.log(`Effect 2 (올바른 접근 - 객체 의존성 분해): 사용자 ID ${user.id}의 데이터를 불러옵니다.`);
+    // ... (생략: API 호출 및 데이터 업데이트)
+  }, [user.id]); // user 객체 중 id 값의 변경에만 반응
+
+  return (
+    // ... (생략) ...
+  );
+}
+```
+
+### 4-3. 올바른 접근 2: `Effect` 의존성 분리 (클로저 활용)
+
+`UserDataFetcherGood1` 컴포넌트에서는 `Effect`의 의존성 배열에서 `theme`을 제거하고 `userId`만 남겨둡니다. `Effect` 내부에서는 `theme` prop의 최신 값을 클로저를 통해 접근합니다. 이렇게 하면 `Effect`는 오직 `userId`가 변경될 때만 사용자 데이터를 다시 불러오고, `theme`이 변경되더라도 데이터 재요청을 발생시키지 않습니다. `theme`은 데이터 페치 로직에 직접적인 영향을 주지 않고, 단순히 데이터를 보여주는 데 사용될 때 유용한 패턴입니다.
+
+```jsx
+import { useState, useEffect } from "react";
+
+function UserDataFetcherGood1({ userId, theme }) {
+  const [userData, setUserData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    console.log(`Effect 3 (올바른 접근 - 분리된 의존성): 사용자 ${userId}의 데이터를 불러옵니다.`);
+    // ... (생략: API 호출 및 데이터 업데이트, theme은 클로저를 통해 접근)
+  }, [userId]); // Effect는 userId 변경에만 반응
+
+  return (
+    // ... (생략) ...
+  );
+}
+```
+
+### 4-4. 올바른 접근 3: `useRef`로 의존성 분리
+
+`UserDataFetcherGood2` 컴포넌트는 `useRef`를 사용하여 `theme` 값을 `ref`에 저장하고, 이 `ref`를 `Effect` 내부에서 사용합니다. `themeRef.current`는 `Effect`의 의존성으로 간주되지 않으므로, `theme`이 변경되더라도 `Effect`는 재실행되지 않습니다. `theme` 값이 변경될 때마다 `themeRef.current`가 업데이트되도록 별도의 `useEffect`를 사용하여 `ref`를 동기화합니다. 이 방법은 `Effect`가 '오직' 특정 값의 변화에만 반응해야 하고, 다른 값이 `Effect`의 로직에 필요하지만 재실행을 유발해서는 안 될 때 유용합니다.
+
+```jsx
+import { useState, useEffect, useRef } from "react";
+
+function UserDataFetcherGood2({ userId, theme }) {
+  const [userData, setUserData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const themeRef = useRef(theme); // ref에 theme 값 저장
+
+  useEffect(() => {
+    themeRef.current = theme; // themeRef.current가 항상 최신 theme 값을 가리키도록 Effect로 동기화
+  }, [theme]);
+
+  useEffect(() => {
+    console.log(
+      `Effect 4 (올바른 접근 - ref 활용): 사용자 ${userId}의 데이터를 불러옵니다.`
+    );
+    // ... (생략: API 호출 및 데이터 업데이트, theme은 ref.current를 통해 접근)
+  }, [userId]); // 여전히 user.id, user.name에 의존
+
+  return (
+    // ... (생략) ...
+  );
+}
+```
+
+---
+
+이 세 가지 사용자 데이터 페치 예시 컴포넌트들을 모두 렌더링하여 비교해 볼 수 있도록 `App` 컴포넌트를 구성합니다.
+
+```jsx
+import { useState, useEffect } from 'react';
+// 위에서 정의된 UserDataFetcherBad, UserDataFetcherGood1, UserDataFetcherGood2 컴포넌트를 가정합니다.
+// 실제 사용 시에는 필요한 컴포넌트들을 import 해야 합니다。
+
+export default function App() {
+  const [currentUser, setCurrentUser] = useState({ id: 1, name: 'Alice' });
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      // user 객체 내부 값은 같지만, 새로운 객체 참조를 생성
+      // 이 경우 UserDataFetcherBad는 재실행되지만, UserDataFetcherGood1과 UserDataFetcherGood2는 재실행되지 않습니다.
+      setCurrentUser({ id: 1, name: 'Alice' });
+    }, 2000);
+
+    const timer2 = setTimeout(() => {
+      // user 객체 내부 값이 변경됨
+      setCurrentUser({ id: 2, name: 'Bob' });
+    }, 4000);
+
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(timer2);
+    };
+  }, []);
+
+  return (
+    <div>
+      <h1>의존성 분해 또는 useRef 활용</h1>
+      <h2>4-1. 잘못된 접근</h2>
+      <UserDataFetcherBad user={currentUser} />
+      <hr style={{ margin: '20px 0' }} />
+      <h2>4-2. 올바른 접근 1</h2>
+      <UserDataFetcherGood1 user={currentUser} />
+      <hr style={{ margin: '20px 0' }} />
+      <h2>4-3. 올바른 접근 2</h2>
+      <UserDataFetcherGood2 user={currentUser} />
+    </div>
+  );
+}
+```
+
+`UserDataFetcherBad`는 `theme` prop 변경 시에도 불필요한 데이터 재요청을 유발합니다. `UserDataFetcherGood1WithDestructuring`은 `user` 객체 중 `user.id` 값의 변경에만 반응하여 객체의 다른 속성 변경으로 인한 불필요한 `Effect` 재실행을 방지합니다. `UserDataFetcherGood1`은 `Effect`의 의존성에서 `theme`을 제거하고 클로저를 통해 최신 값을 활용하여 `userId` 변경 시에만 데이터를 불러옵니다. `UserDataFetcherGood2`는 `useRef`를 사용하여 `theme`을 `ref`에 저장하고 `Effect` 내부에서 `ref.current`로 접근함으로써 `theme` 변경에 따른 `Effect` 재실행을 완전히 분리합니다. 이 세 가지 올바른 접근 방식은 `Effect`의 의존성 배열을 간결하게 유지하고 필요한 경우에만 `Effect`가 실행되도록 하는 데 도움을 줍니다.
+
+## 5. `Effect` 분리: 관심사 축소로 의존성 간결화
+
+하나의 `Effect`가 여러 가지 독립적인 로직을 처리하려고 할 때, 의존성 배열은 길어지고 복잡해지기 쉽습니다. 이는 `Effect`의 재실행 로직을 예측하기 어렵게 만들고 불필요한 실행을 유발할 가능성을 높입니다. `Effect`를 여러 개로 분리하여 각 `Effect`가 단 하나의 관심사만 책임지도록 만들면, 의존성 배열을 간결하게 유지하고 `Effect`의 재실행 로직을 명확하게 제어할 수 있습니다.
+
+여기서는 채팅방 연결 및 메시지 처리 등 여러 기능을 하나의 `Effect`에서 관리하는 대신, 각 기능을 별도의 `Effect`로 분리하여 의존성을 간결화하는 방법을 보여줍니다.
+
+> 💡 포스트에선 핵심 코드만 보여주고 있으며, 전체 코드는 아래 링크에서 확인할 수 있습니다.
+
+[Gist 링크 입력](https://gist.github.com/ddock4you/a912402b410dbd6c279ac9633f5d1816)
+
+### 5-1. 단일 `Effect`로 여러 관심사 처리 (개선 전)
+
+```jsx
+import { useState, useEffect } from "react";
+
+function createConnection(serverUrl, roomId) {
+  // ... (생략)
+  return {
+    connect() {
+      console.log(`📡 Connecting to ${serverUrl} room ${roomId}...`);
+    },
+    disconnect() {
+      console.log(`❌ Disconnected from ${serverUrl} room ${roomId}.`);
+    },
+  };
+}
+
+function ChatRoomBad({ roomId }) {
+  const [serverUrl, setServerUrl] = useState("https://localhost:1234");
+
+  useEffect(() => {
+    // ChatRoom 연결 관리 Effect
+    console.log(
+      "Effect 1 (잘못된 접근): ChatRoom 연결 생성 (roomId, serverUrl 변경 시 실행)"
+    );
+    const connection = createConnection(serverUrl, roomId);
+    connection.connect();
+    return () => connection.disconnect();
+  }, [roomId, serverUrl]);
+
+  return (
+    // ... (생략) ...
+  );
+}
+```
+
+### 5-2. 올바른 접근: `Effect` 분리를 통한 관심사 축소
+
+`ChatRoomGood` 컴포넌트에서는 `createConnection` 함수를 분리하여 `Effect`가 오직 `serverUrl`과 `roomId`의 변경에만 반응하도록 합니다. 이는 `Effect`의 의존성 배열을 간결하게 유지하고, `Effect`가 담당하는 책임 영역을 '채팅방 연결 관리'로 명확히 제한합니다. 각 `Effect`가 하나의 독립적인 관심사에만 집중함으로써 코드의 가독성이 향상되고, `Effect`의 재실행 로직을 더욱 쉽게 이해하고 관리할 수 있게 됩니다.
+
+```jsx
+import { useState, useEffect } from "react";
+
+function createConnection(serverUrl, roomId) {
+  // ... (생략)
+  return {
+    connect() {
+      console.log(`📡 Connecting to ${serverUrl} room ${roomId}...`);
+    },
+    disconnect() {
+      console.log(`❌ Disconnected from ${serverUrl} room ${roomId}.`);
+    },
+  };
+}
+
+function ChatRoomGood({ roomId }) {
+  const [serverUrl, setServerUrl] = useState("https://localhost:1234");
+
+  useEffect(() => {
+    console.log(
+      "Effect 2 (올바른 접근): ChatRoom 연결 생성 (roomId, serverUrl 변경 시 실행)"
+    );
+    const connection = createConnection(serverUrl, roomId);
+    connection.connect();
+    return () => connection.disconnect();
+  }, [roomId, serverUrl]);
+
+  return (
+    // ... (생략) ...
+  );
+}
+```
+
+---
+
+이 두 가지 채팅방 예시 컴포넌트들을 모두 렌더링하여 비교해 볼 수 있도록 `App` 컴포넌트를 구성합니다.
+
+```jsx
+import { useState } from 'react';
+// 위에서 정의된 ChatRoomBad, ChatRoomGood 컴포넌트를 가정합니다.
+// 실제 사용 시에는 필요한 컴포넌트들을 import 해야 합니다.
+
+export default function App() {
+  const [roomId, setRoomId] = useState('general');
+  const [show, setShow] = useState(false);
+
+  return (
+    <>
+      <label>
+        채팅방 ID:
+        <input value={roomId} onChange={e => setRoomId(e.target.value)} />
+      </label>
+      <button onClick={() => setShow(!show)}>{show ? '숨기기' : '보이기'}</button>
+      <hr />
+      {show && (
+        <>
+          <h2>5-1. 단일 Effect로 여러 관심사 처리 (개선 전)</h2>
+          <ChatRoomBad roomId={roomId} />
+          <hr style={{ margin: '20px 0' }} />
+          <h2>5-2. 올바른 접근</h2>
+          <ChatRoomGood roomId={roomId} />
+        </>
+      )}
+    </>
+  );
+}
+```
+
+`ChatRoomBad`는 하나의 `Effect`에 모든 웹소켓 로직을 포함하여 의존성 배열이 너무 길어져 재실행 로직을 예측하기 어렵고 불필요한 실행이 발생할 수 있습니다. `ChatRoomGood`는 각 관심사에 대한 별도의 `Effect`를 사용하여 의존성 배열을 간결하게 유지하고 재실행 로직을 명확히 제어합니다.
+
+## Effect 의존성 재설계의 특징 (심화 전략 중심)
+
+### 3. '불필요한 클로저' 문제 해결
+
+JavaScript의 클로저 특성으로 인해, `Effect` 내부에서 사용되는 함수나 객체가 매 렌더링마다 새로운 참조를 가지게 되면 `Effect`가 불필요하게 재실행될 수 있습니다. `useMemo`와 같은 훅을 사용하여 이러한 객체나 함수의 참조 동일성을 유지함으로써, `Effect`의 안정성을 확보할 수 있습니다. 이는 `Effect`의 재실행 빈도를 줄이는 직접적인 방법입니다.
+
+### 4. '단일 책임 원칙' 준수
+
+각 `Effect`는 단일하고 명확한 책임만을 가지도록 설계하는 것이 좋습니다. 하나의 `Effect`가 여러 가지 독립적인 동기화 로직을 수행하려고 하면 의존성 배열이 복잡해지고 관리하기 어려워집니다. `Effect`를 여러 개로 분리하여 각 `Effect`가 특정한 목적에만 충실하도록 만들면, 의존성 배열을 간결하게 유지하고 `Effect`의 가독성 및 유지보수성을 향상시킬 수 있습니다.
+
+## 요약
+
+이번 포스트에서는 React `Effect`의 의존성을 가볍게 관리하여 불필요한 재실행을 줄이는 심화 전략을 살펴보았습니다. 핵심은 `Effect`가 '진정으로 의존해야 하는' 값만을 의존성 배열에 포함시키고, 그렇지 않은 값들은 다른 방법으로 처리하는 것입니다.
+
+1. **의존성 분해 또는 `ref` 활용**: `Effect`가 필요로 하지만 그 변화에 직접 반응할 필요는 없는 값들은 `Effect`의 의존성 배열에서 제외하고 클로저나 `useRef`를 통해 최신 값을 읽는 방식으로 관리하여 의존성 배열을 최소화합니다.
+2. **객체 의존성 분해 (특정 값만 반응)**: 의존성 배열에 객체 전체를 포함하는 대신, `Effect`가 실제로 반응해야 하는 객체 내부의 특정 원시 값만을 의존성으로 지정하여 불필요한 `Effect` 재실행을 방지합니다.
+3. **`Effect` 분리**: 여러 독립적인 `Side Effect`를 하나의 `Effect`에서 처리하기보다는, 각 `Side Effect`에 대해 별도의 `Effect`를 분리하여 단일 책임 원칙을 따르고 의존성 배열을 단순화합니다.
+
+이러한 전략들을 통해 여러분의 React 애플리케이션에서 `Effect`의 불필요한 재실행을 효과적으로 줄이고, 더욱 예측 가능하며 효율적인 컴포넌트 로직을 구현할 수 있기를 바랍니다.
+
+## 참고문서
+
+– [[Effect의 의존성 제거하기 (Removing Effect Dependencies)](https://ko.react.dev/learn/removing-effect-dependencies)]

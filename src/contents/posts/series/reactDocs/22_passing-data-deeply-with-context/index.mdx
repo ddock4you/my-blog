@@ -1,0 +1,170 @@
+---
+title: '전역 상태의 시작 - Context API로 Props Drilling 해결하기'
+publishedAt: '2025-08-22'
+summary: 'Context로 props drilling 해소: 전역 데이터 공유'
+category: '개발'
+series: 'reactDocs'
+image: '/contents/posts/series/reactDocs/images/react-logo.svg'
+---
+
+## 들어가며
+
+이전 편들에서는 리액트 컴포넌트 내부에서 상태를 관리하는 방법, 그리고 인접한 컴포넌트 간에 `State`를 공유하기 위한 `Lifting State Up` 패턴에 대해 살펴보았습니다. 이러한 방법들은 컴포넌트 계층이 비교적 얕거나, 공유해야 할 `State`가 가까운 곳에 있을 때 효율적일 수 있습니다. 하지만 애플리케이션의 규모가 커지고 컴포넌트 트리가 깊어지면서, 멀리 떨어져 있는 컴포넌트들이 동일한 `State`나 함수를 필요로 하는 경우가 생길 수 있습니다. 이런 상황에서 데이터를 일일이 `props`로 전달하는 과정은 개발자를 지치게 만드는 '`Props Drilling`'이라는 문제를 야기할 가능성이 있습니다.
+
+이번 편에서는 이러한 `Props Drilling` 문제를 해결하고, 컴포넌트 트리 깊숙한 곳까지 데이터를 손쉽게 전달할 수 있는 리액트의 강력한 기능인 `Context API`에 대해 함께 알아보려고 합니다. `Context API`는 마치 수도관처럼 데이터를 원하는 곳까지 직접 연결해주는 역할을 하며, 전역적으로 사용될 수 있는 데이터를 효율적으로 관리하는 데 도움을 줄 수 있습니다.
+
+## 리액트 방식의 주요 특징
+
+`Context API`는 리액트 컴포넌트 트리 안에서 `props`를 명시적으로 전달하지 않고도 전역적인 데이터를 공유할 수 있도록 설계된 기능입니다. 이는 테마 설정 (다크 모드/라이트 모드), 사용자 인증 정보, 다국어 지원 등 애플리케이션의 여러 컴포넌트에서 광범위하게 사용될 필요가 있는 데이터를 관리하는 데 특히 유용할 수 있습니다. `Context API`는 개발자가 일일이 `props`를 넘겨주는 수고를 덜어주면서, 코드의 복잡성을 줄이고 유지보수성을 높이는 데 기여할 수 있습니다.
+
+## Props Drilling 문제와 Context API의 필요성
+
+`Props Drilling`은 부모 컴포넌트에서 자식 컴포넌트, 그리고 그 자식 컴포넌트의 자식 컴포넌트로 데이터를 `props`를 통해 계속해서 전달해야 하는 상황을 의미합니다. 이 과정에서 중간에 있는 컴포넌트들은 실제로는 해당 데이터를 사용하지 않음에도 불구하고, 그저 데이터를 전달하는 통로 역할만 수행하게 됩니다. 이 방식은 다음과 같은 문제점을 가져올 수 있습니다.
+
+1. **코드 가독성 저해**: 사용하지 않는 `props`가 중간 컴포넌트에 계속해서 추가되면서, 해당 컴포넌트의 인터페이스가 불필요하게 복잡해질 수 있습니다.
+2. **유지보수 어려움**: 데이터 구조가 변경되거나 `props` 이름이 바뀌면, 해당 `props`를 전달하는 모든 중간 컴포넌트를 수정해야 할 가능성이 있어 유지보수가 어려워질 수 있습니다.
+3. **디버깅의 복잡성**: 특정 데이터가 어디서 왔고, 어떤 경로를 거쳐 전달되었는지 추적하기가 어려워질 수 있습니다.
+
+이러한 `Props Drilling` 문제는 컴포넌트 트리가 깊어질수록 더욱 심화됩니다. `Context API`는 이러한 상황에서 데이터를 필요로 하는 컴포넌트에만 직접 데이터를 제공함으로써, 중간 컴포넌트들이 데이터를 전달하는 부담에서 벗어나게 해줍니다. 이는 각 컴포넌트가 자신의 역할에만 집중할 수 있게 하여 코드의 응집도를 높여줄 수 있습니다.
+
+## Context API로 데이터 깊이 전달하기
+
+`Context API`를 사용하여 데이터를 전달하는 과정은 크게 세 가지 주요 단계로 나눌 수 있습니다:
+
+1. **Context 객체 생성**: `React.createContext()` 함수를 사용하여 `Context` 객체를 생성합니다. `Context` 객체는 `Provider`와 `Consumer` (혹은 `useContext` 훅)를 포함하며, `Provider`는 `Context` 값을 제공하는 역할을 합니다. 이 함수는 선택적으로 기본값을 인자로 받을 수 있으며, 이 기본값은 `Provider`가 없는 경우나 `Provider`의 `value`가 `undefined`일 때 사용됩니다.
+
+   ```jsx
+   import { createContext } from 'react';
+   const MyContext = createContext(null);
+   ```
+
+2. **Context 값 제공**: 생성된 `Context` 객체(이후 React 19부터는 `<Context>` 자체)를 사용하여 `Context` 값을 제공합니다. `<Context>`는 `value`라는 `prop`을 받으며, 이 `value`가 `Context`를 통해 전달하고자 하는 실제 데이터가 됩니다. `<Context>` 컴포넌트로 감싸진 모든 하위 컴포넌트들은 이 `value`에 접근할 수 있습니다. (React 19 이전 버전에서는 `Context.Provider`를 사용했습니다.)
+
+   ```jsx
+   function App() {
+     const someValue = 'Hello from Context';
+     // React 19부터는 <MyContext value={someValue}> 사용
+     return <MyContext value={someValue}>{/* 하위 컴포넌트들 */}</MyContext>;
+   }
+   ```
+
+3. **Context 값 사용**: `Context` 값을 필요로 하는 하위 컴포넌트에서는 `useContext` Hook을 사용하여 `Context`가 제공한 값에 접근합니다. `useContext` Hook은 인자로 `Context` 객체를 받고, 해당 `Context`의 현재 값을 반환합니다.
+
+```jsx
+import { useContext } from 'react';
+
+function MyComponent() {
+  const value = useContext(MyContext);
+  return <p>{value}</p>; // "Hello from Context" 출력
+}
+```
+
+이러한 과정을 통해, 개발자는 컴포넌트 트리의 깊이에 상관없이 데이터를 효율적으로 전달하고 소비할 수 있습니다.
+
+## 리액트로 Context API 구현하기
+
+여기서는 전역 테마 설정을 `Context API`를 통해 관리하는 간단한 예제를 살펴보겠습니다. 이 예제는 사용자 인터페이스의 테마(라이트 모드 또는 다크 모드)를 전역적으로 변경하는 기능을 구현합니다.
+
+### 파일 구조
+
+```text
+src/
+├── ThemeContext.js
+├── Toolbar.jsx
+└── App.jsx
+```
+
+### 코드
+
+#### `ThemeContext.js`
+
+```jsx
+import { createContext, useContext, useState } from 'react';
+
+// 1. ThemeContext 객체 생성
+const ThemeContext = createContext(null);
+
+// 2. 테마 값을 제공하는 Custom Provider 컴포넌트
+export function ThemeProvider({ children }) {
+  const [theme, setTheme] = useState('light'); // 초기 테마는 'light'
+
+  const toggleTheme = () => {
+    setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
+  };
+
+  return <ThemeContext value={{ theme, toggleTheme }}>{children}</ThemeContext>;
+}
+
+// 3. 테마 값을 편리하게 사용하기 위한 Custom Hook
+export function useTheme() {
+  const context = useContext(ThemeContext);
+  if (context === undefined) {
+    throw new Error('useTheme must be used within a ThemeProvider');
+  }
+  return context;
+}
+```
+
+이 코드에서 `ThemeContext`는 `createContext(null)`을 통해 생성됩니다. `ThemeProvider` 컴포넌트는 `useState`를 사용하여 현재 테마 상태(`light` 또는 `dark`)를 관리하고, 이 테마 상태와 테마를 토글하는 함수(`toggleTheme`)를 `value`로 `ThemeContext`에 제공합니다. `useTheme` 커스텀 훅은 컴포넌트에서 `Context` 값을 더 편리하고 안전하게 사용할 수 있도록 돕습니다. 만약 `ThemeProvider` 내에서 사용되지 않으면 에러를 발생시켜 오용을 방지합니다.
+
+#### `App.jsx`
+
+```jsx
+import React from 'react';
+import { ThemeProvider } from './ThemeContext';
+import Toolbar from './Toolbar';
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <Toolbar />
+    </ThemeProvider>
+  );
+}
+```
+
+`App.jsx`에서는 `ThemeProvider`로 `Toolbar` 컴포넌트를 감싸 `Toolbar` 및 그 하위 컴포넌트들이 테마 `Context`에 접근할 수 있도록 설정합니다. 이렇게 하면 `Toolbar`가 직접 테마 `props`를 받지 않아도 됩니다.
+
+#### `Toolbar.jsx`
+
+```jsx
+import React from 'react';
+import { useTheme } from './ThemeContext';
+
+export default function Toolbar() {
+  const { theme, toggleTheme } = useTheme();
+
+  // 테마에 따라 스타일이 적용된다고 가정합니다. (CSS 코드 생략)
+
+  return (
+    <div className={`toolbar-${theme}`}>
+      <span>현재 테마: {theme === 'light' ? '밝은 모드' : '어두운 모드'}</span>
+      <button onClick={toggleTheme} className={`button-${theme}`}>
+        테마 전환
+      </button>
+    </div>
+  );
+}
+```
+
+`Toolbar.jsx` 컴포넌트에서는 `useTheme` 커스텀 훅을 사용하여 `theme` 값과 `toggleTheme` 함수에 직접 접근합니다. 이제 `Toolbar`는 `props`를 통해 테마 데이터를 전달받을 필요 없이, `Context`를 통해 필요한 정보에 접근하여 자신의 UI를 렌더링하고 테마를 변경할 수 있게 됩니다. 이 예시를 통해 `Props Drilling` 문제가 해결되고, 컴포넌트 간의 데이터 흐름이 더욱 간결해진 것을 알 수 있습니다.
+
+## Context API의 특징
+
+1. **전역 상태 관리의 용이성**: `Context API`는 컴포넌트 트리의 어느 깊이에서든 필요한 데이터에 직접 접근할 수 있게 하여, 애플리케이션 전반에 걸쳐 사용되는 전역 상태를 효율적으로 관리할 수 있도록 돕습니다. 이는 여러 컴포넌트에 걸쳐 동일한 데이터가 필요한 경우에 특히 유용할 수 있습니다.
+2. **`Props Drilling` 해소**: 더 이상 상위 컴포넌트에서 하위 컴포넌트로 데이터를 `props`로 일일이 전달할 필요가 없어집니다. 이로 인해 불필요한 `props` 전달이 줄어들어 코드의 명확성이 높아지고, 컴포넌트 인터페이스가 간결해질 수 있습니다.
+3. **컴포넌트 재사용성 향상**: 중간 컴포넌트들이 특정 데이터에 종속되지 않고, 그저 자신의 `children`을 렌더링하는 역할에만 집중할 수 있게 됩니다. 이는 컴포넌트의 결합도를 낮춰 재사용성을 향상하는 데 도움을 줄 수 있습니다.
+4. **명시적인 데이터 흐름**: `Context` (React 19 이전 버전에서는 `Context.Provider`)를 통해 데이터가 어디서 제공되고, `useContext`를 통해 어디서 소비되는지 명확히 알 수 있습니다. 이는 코드의 추적을 용이하게 하여 디버깅 시에도 도움이 될 수 있습니다.
+
+## 요약
+
+이번 편에서는 컴포넌트 트리가 깊어질 때 발생하는 `Props Drilling` 문제를 해결하기 위한 리액트의 `Context API`에 대해 알아보았습니다. `Context API`는 `props`를 통해 데이터를 수동으로 전달하는 대신, 컴포넌트 트리의 깊이에 상관없이 데이터를 효율적으로 공유할 수 있는 방법을 제공합니다. 이를 통해 우리는 애플리케이션의 전역적인 상태를 더욱 체계적으로 관리하고, 코드의 가독성과 유지보수성을 향상하는 데 도움을 받을 수 있습니다.
+
+- **Props Drilling**: 컴포넌트 트리를 거쳐 `props`를 불필요하게 전달하는 문제
+- **Context API**: `props` 없이 컴포넌트 트리 내에서 데이터 공유를 가능하게 하는 리액트 기능
+- **주요 구성**: `createContext`로 Context 생성, `Context` (React 19 이전 버전에서는 `Context.Provider`)로 값 제공, `useContext`로 값 사용
+- **장점**: 전역 상태 관리 용이, `Props Drilling` 해소, 컴포넌트 재사용성 향상, 명시적인 데이터 흐름
+
+## 참고문서
+
+– [[Context로 데이터 깊이 전달하기 (Passing Data Deeply with Context)](https://ko.react.dev/learn/passing-data-deeply-with-context)]

@@ -1,0 +1,294 @@
+---
+title: '복잡한 상태 로직의 재구성 - useState에서 useReducer로 전환하기'
+publishedAt: '2025-08-21'
+summary: 'useState→useReducer 전환: 로직 분리·dispatch 기반 구조'
+category: '개발'
+series: 'reactDocs'
+image: '/contents/posts/series/reactDocs/images/react-logo.svg'
+---
+
+## 들어가며
+
+이전 4-3편에서 `useReducer` Hook의 기본 개념과 `useState`와 비교한 선택 기준을 살펴보았습니다. `useState`가 단순하고 독립적인 상태 관리에 효율적이라면, `useReducer`는 여러 상태가 얽혀 있는 복잡한 로직을 체계적으로 관리하는 데 강력한 도구임을 알 수 있었습니다. 하지만 `useState`로 이미 구현된 애플리케이션의 상태 로직이 점점 복잡해지면서 `useReducer`의 필요성을 느끼는 경우가 많습니다. 이때 기존 코드를 `useReducer` 기반으로 어떻게 전환할 수 있을지 막막함을 느낄 수 있습니다.
+
+이번 편에서는 `useState`로 구현된 컴포넌트의 상태 관리 로직을 `useReducer` 기반으로 전환하는 과정을 심층적으로 탐구해 보겠습니다. 특히 간단한 `Todo List` 컴포넌트를 예시로, 단계별 마이그레이션 방법을 살펴보고, 이 전환을 통해 얻을 수 있는 코드의 명확성, 유지보수성, 그리고 테스트 용이성 향상이라는 실질적인 이점들을 중점적으로 다룰 것입니다.
+
+## useState에서 useReducer로 마이그레이션하기
+
+기존에 `useState`로 구현된 컴포넌트의 상태 로직이 복잡해지면서 `useReducer`로 전환해야 할 필요성을 느낄 때가 있습니다. 이 섹션에서는 간단한 `Todo List` 컴포넌트를 예시로, `useState`에서 `useReducer`로 어떻게 상태 관리 방식을 마이그레이션할 수 있는지 단계별로 살펴보겠습니다.
+
+### 기존 `useState`를 사용한 Todo List (문제점)
+
+먼저 `useState`를 사용하여 `Todo List`를 구현한 예시를 보겠습니다. 이 예시는 `Todo` 항목을 추가하고, 완료 상태를 토글하며, 삭제하는 기능을 포함합니다.
+
+#### 파일 구조
+
+```text
+src/
+├── components/
+│   ├── TodoApp.jsx
+│   ├── TodoItem.jsx
+│   └── TodoInput.jsx
+└── main.jsx
+```
+
+#### `src/components/TodoItem.jsx`
+
+```jsx
+// src/components/TodoItem.jsx
+export default function TodoItem({ todo, onToggle, onDelete }) {
+  return (
+    <li style={{ textDecoration: todo.done ? 'line-through' : 'none' }}>
+      <input type="checkbox" checked={todo.done} onChange={() => onToggle(todo.id)} />
+      {todo.text}
+      <button onClick={() => onDelete(todo.id)} style={{ marginLeft: '10px' }}>
+        삭제
+      </button>
+    </li>
+  );
+}
+```
+
+이 `TodoItem.jsx` 컴포넌트는 개별 `Todo` 항목을 표시하는 컴포넌트입니다. `todo` 객체를 `prop`으로 전달받아 내용을 렌더링하고, 체크박스 클릭 시 `onToggle` `prop` 함수를, 삭제 버튼 클릭 시 `onDelete` `prop` 함수를 호출합니다.
+
+#### `src/components/TodoInput.jsx`
+
+```jsx
+// src/components/TodoInput.jsx
+import { useState } from 'react';
+
+export default function TodoInput({ onAddTodo }) {
+  const [text, setText] = useState('');
+
+  const handleSubmit = e => {
+    e.preventDefault();
+    if (text.trim() === '') return;
+    onAddTodo(text);
+    setText('');
+  };
+
+  return (
+    <form onSubmit={handleSubmit} style={{ marginBottom: '20px' }}>
+      <input
+        type="text"
+        value={text}
+        onChange={e => setText(e.target.value)}
+        placeholder="새로운 할 일을 추가하세요"
+        style={{ marginRight: '10px', padding: '8px' }}
+      />
+      <button type="submit" style={{ padding: '8px 15px' }}>
+        추가
+      </button>
+    </form>
+  );
+}
+```
+
+이 `TodoInput.jsx` 컴포넌트는 `dispatch` 함수를 `prop`으로 전달받습니다.
+
+- `form` 제출 시 `dispatch({ type: ADD_TODO, text: text })`를 호출하여 `ADD_TODO` 액션을 `reducer`에 전달합니다. 이제 `TodoInput` 컴포넌트는 "무엇을 할지"(`ADD_TODO` 액션)만 알면 되고, "어떻게" 새로운 `Todo`가 추가될지는 `todoReducer`에 위임합니다.
+
+#### `src/components/TodoApp.jsx`
+
+```jsx
+// src/components/TodoApp.jsx
+import { useState } from 'react';
+import TodoInput from './TodoInput';
+import TodoItem from './TodoItem';
+
+let nextId = 0; // 고유 ID 생성을 위한 변수
+
+export default function TodoApp() {
+  const [todos, setTodos] = useState([]);
+
+  const handleAddTodo = text => {
+    setTodos(prevTodos => [...prevTodos, { id: nextId++, text, done: false }]);
+  };
+
+  const handleToggleTodo = id => {
+    setTodos(prevTodos =>
+      prevTodos.map(todo => (todo.id === id ? { ...todo, done: !todo.done } : todo))
+    );
+  };
+
+  const handleDeleteTodo = id => {
+    setTodos(prevTodos => prevTodos.filter(todo => todo.id !== id));
+  };
+
+  return (
+    <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto' }}>
+      <h1>나의 할 일 목록 (useState)</h1>
+      <TodoInput onAddTodo={handleAddTodo} />
+      <ul>
+        {todos.map(todo => (
+          <TodoItem
+            key={todo.id}
+            todo={todo}
+            onToggle={handleToggleTodo}
+            onDelete={handleDeleteTodo}
+          />
+        ))}
+      </ul>
+    </div>
+  );
+}
+```
+
+#### 코드 작동 방식 설명 (useState 버전)
+
+이 `useState` 버전의 `Todo List`는 다음과 같이 작동합니다.
+
+**문제점**: `TodoApp` 컴포넌트에 `handleAddTodo`, `handleToggleTodo`, `handleDeleteTodo`와 같이 `todos` 상태를 조작하는 로직이 직접적으로 포함되어 있습니다. 상태 변화 로직이 많아질수록 컴포넌트의 코드가 길어지고 복잡해지며, `todos` 배열을 직접 조작하는 함수들이 많아져 유지보수 및 테스트가 어려워질 수 있습니다. 특히 `setTodos` 호출마다 `prevTodos`를 인자로 받는 함수형 업데이트를 일일이 작성해야 하는 번거로움도 있습니다.
+
+## useReducer로 마이그레이션 (개선된 Todo List)
+
+### 파일 구조 (useReducer 버전)
+
+```text
+src/
+├── reducers/
+│   └── todoReducer.js
+├── components/
+│   ├── TodoApp.jsx
+│   ├── TodoItem.jsx
+│   └── TodoInput.jsx
+└── main.jsx
+```
+
+#### `src/reducers/todoReducer.js`
+
+```jsx
+// src/reducers/todoReducer.js
+export const ADD_TODO = 'ADD_TODO';
+export const TOGGLE_TODO = 'TOGGLE_TODO';
+export const DELETE_TODO = 'DELETE_TODO';
+
+let nextId = 0;
+
+export function todoReducer(todos, action) {
+  switch (action.type) {
+    case ADD_TODO: {
+      return [...todos, { id: nextId++, text: action.text, done: false }];
+    }
+    case TOGGLE_TODO: {
+      return todos.map(todo => (todo.id === action.id ? { ...todo, done: !todo.done } : todo));
+    }
+    case DELETE_TODO: {
+      return todos.filter(todo => todo.id !== action.id);
+    }
+    default: {
+      throw Error('Unknown action: ' + action.type);
+    }
+  }
+}
+```
+
+이 `src/reducers/todoReducer.js` 파일은 `todos` 상태를 관리하는 모든 로직이 이 `reducer` 함수 안에 응집됩니다.
+
+- `todoReducer` 함수는 현재 `todos` 배열과 `action` 객체를 인자로 받습니다.
+- `ADD_TODO` 액션이 발생하면 새로운 `Todo` 객체를 `todos` 배열에 추가한 새 배열을 반환합니다.
+- `TOGGLE_TODO` 액션은 특정 `id`의 `Todo` 객체의 `done` 속성을 토글한 새 배열을 반환합니다.
+- `DELETE_TODO` 액션은 특정 `id`의 `Todo` 객체를 제외한 새 배열을 반환합니다.
+- 모든 경우에 **기존 `todos` 배열을 직접 수정하지 않고, 항상 새로운 배열을 반환**하여 불변성을 유지합니다. 이는 React가 상태 변화를 정확히 감지하고 UI를 업데이트하는 데 필수적입니다.
+
+> **참고**: `ADD_TODO`, `TOGGLE_TODO`, `DELETE_TODO`와 같은 액션 타입 문자열을 상수로 정의하여 사용하는 것은 휴먼 에러, 특히 문자열 오타로 인한 버그를 방지하고 코드의 일관성과 유지보수성을 높이는 좋은 습관입니다. 예를 들어, `'ADD_TODO'`를 `'AD_TODO'`로 잘못 입력하는 실수를 컴파일 시점에 감지할 수 있게 됩니다.
+
+#### `src/components/TodoItem.jsx` (useReducer 버전)
+
+```jsx
+// src/components/TodoItem.jsx
+export default function TodoItem({ todo, dispatch }) {
+  return (
+    <li style={{ textDecoration: todo.done ? 'line-through' : 'none' }}>
+      <input
+        type="checkbox"
+        checked={todo.done}
+        onChange={() => dispatch({ type: TOGGLE_TODO, id: todo.id })}
+      />
+      {todo.text}
+      <button
+        onClick={() => dispatch({ type: DELETE_TODO, id: todo.id })}
+        style={{ marginLeft: '10px' }}
+      >
+        삭제
+      </button>
+    </li>
+  );
+}
+```
+
+이 `TodoItem.jsx` 컴포넌트는 `dispatch` 함수를 `prop`으로 전달받습니다.
+
+- 체크박스 변경 시 `dispatch({ type: TOGGLE_TODO, id: todo.id })`를, 삭제 버튼 클릭 시 `dispatch({ type: DELETE_TODO, id: todo.id })`를 호출합니다. 이 컴포넌트 역시 "무엇을 할지"(`TOGGLE_TODO`, `DELETE_TODO` 액션)만 알면 됩니다.
+
+#### `src/components/TodoInput.jsx` (useReducer 버전)
+
+```jsx
+// src/components/TodoInput.jsx
+import { useState } from 'react';
+
+export default function TodoInput({ dispatch }) {
+  const [text, setText] = useState('');
+
+  const handleSubmit = e => {
+    e.preventDefault();
+    if (text.trim() === '') return;
+    dispatch({ type: ADD_TODO, text: text });
+    setText('');
+  };
+
+  return (
+    <form onSubmit={handleSubmit} style={{ marginBottom: '20px' }}>
+      <input
+        type="text"
+        value={text}
+        onChange={e => setText(e.target.value)}
+        placeholder="새로운 할 일을 추가하세요"
+        style={{ marginRight: '10px', padding: '8px' }}
+      />
+      <button type="submit" style={{ padding: '8px 15px' }}>
+        추가
+      </button>
+    </form>
+  );
+}
+```
+
+이 `TodoApp.jsx` 컴포넌트는 최상위 컴포넌트로서 `useReducer` Hook을 사용하여 `todos` 상태와 `dispatch` 함수를 가져옵니다.
+
+- `const [todos, dispatch] = useReducer(todoReducer, []);`
+  - `todoReducer`와 초기 상태(`[]`)를 `useReducer`에 전달하여 `todos` (현재 `Todo` 목록)와 `dispatch` (상태 변경 요청 함수)를 얻습니다.
+- `TodoInput`과 `TodoItem` 컴포넌트에는 `dispatch` 함수를 `prop`으로 전달합니다. `useState` 버전에서 각각의 상태 변경 로직 함수를 전달했던 것과는 다르게, `useReducer` 버전에서는 `dispatch` 함수 하나만 전달하면 됩니다. 이는 `prop`의 수를 줄이고 컴포넌트의 결합도를 낮추는 데 도움이 될 수 있습니다.
+
+**개선점**: `TodoApp` 컴포넌트의 역할이 `todos` 상태를 직접 조작하는 것에서 `useReducer`를 사용하여 `todos` 상태와 `dispatch` 함수를 관리하고 하위 컴포넌트에 `dispatch` 함수를 전달하는 것으로 명확히 분리되었습니다. 상태 변경 로직은 `todoReducer.js` 파일에 캡슐화되어 재사용성과 테스트 용이성이 향상되었습니다. 또한, `dispatch` 함수는 `prop`으로 전달되더라도 일반적으로 변경되지 않으므로 `useCallback` (자세한 내용은 5-5편에서 다룰 예정입니다) 등으로 최적화할 필요가 적다는 이점도 있습니다.
+
+## 핵심 비교 포인트
+
+다음 표는 `useState`와 `useReducer`의 핵심 비교 포인트를 요약한 것입니다.
+
+| 특징/상황                 | `useState`                                              | `useReducer`                                                        |
+| :------------------------ | :------------------------------------------------------ | :------------------------------------------------------------------ |
+| **상태 로직 관리 방식**   | 로직이 컴포넌트 내부에 직접 존재하여 복잡성 증가 가능성 | 로직이 `reducer` 함수로 분리되어 중앙 집중화 및 추상화              |
+| **상태 변경 의도 표현**   | `setCount(count + 1)`처럼 "어떻게" 변경할지 직접 명시   | `dispatch({ type: ADD_TODO })`처럼 "무엇을 할지" 의도를 명확히 표현 |
+| **코드 구조 및 유지보수** | 로직이 컴포넌트와 결합되어 비대화 가능성                | 관심사 분리 및 코드 모듈화로 유지보수성 향상                        |
+| **테스트 용이성**         | 컴포넌트 컨텍스트 필요                                  | `reducer` 함수가 순수 함수이므로 독립적인 테스트 용이               |
+
+## 요약
+
+이번 편에서는 `useState`로 구현된 컴포넌트의 상태 관리 로직을 `useReducer` 기반으로 전환하는 과정을 심층적으로 탐구해 보았습니다. 간단한 `Todo List` 컴포넌트를 예시로 단계별 마이그레이션 방법을 살펴보고, 이 전환을 통해 얻을 수 있는 코드의 명확성, 유지보수성, 그리고 테스트 용이성 향상이라는 실질적인 이점들을 중점적으로 다루었습니다.
+
+공부한 것을 정리해보면 다음과 같습니다.
+
+- **마이그레이션 필요성**: `useState`의 로직 복잡성 증가 시 `useReducer`로 전환 필요.
+- **`useState` 문제점**: `TodoApp`에 상태 조작 로직이 직접 포함되어 코드 복잡성 및 유지보수성 저하.
+- **`useReducer` 개선점**: `reducer` 함수로 상태 로직 분리, 컴포넌트 역할 분리, `dispatch` 함수 전달로 `prop` 감소.
+- **핵심 원칙**: `reducer`는 항상 순수 함수여야 하며, 기존 상태를 직접 수정하지 않고 새로운 상태 반환.
+- **이점**: 코드의 명확성, 유지보수성, 테스트 용이성 향상.
+
+`useState`에서 `useReducer`로의 전환은 단순히 코드를 바꾸는 것을 넘어, 상태 관리 패러다임의 변화를 의미합니다. 이를 통해 우리는 `React` 애플리케이션의 복잡성을 효과적으로 관리하고, 더욱 견고하고 확장 가능한 아키텍처를 구축할 수 있습니다. 특히 팀 프로젝트나 대규모 애플리케이션 개발 시 `useReducer`는 상태 변경의 "규약"을 명확히 함으로써 협업의 효율성을 높이는 데 크게 기여할 수 있습니다.
+
+다음 4-5편에서는 `Props Drilling` 문제를 해결하고 컴포넌트 트리 깊이와 상관없이 데이터를 효율적으로 전달하는 `Context API`에 대해 알아보겠습니다.
+
+## 참고문서
+
+– [[useReducer로 State 로직 추출하기 (Extracting State Logic into a Reducer)](https://ko.react.dev/learn/extracting-state-logic-into-a-reducer)]

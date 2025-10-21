@@ -1,10 +1,10 @@
 categories:
   - slug: development
     name: 개발
-    order: 10
+    order: 30
   - slug: setupMigration
     name: 환경설정
     order: 20
   - slug: misc
-    name: 기타
-    order: 99
+    name: 회고
+    order: 10

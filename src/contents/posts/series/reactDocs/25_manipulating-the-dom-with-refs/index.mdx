@@ -1,0 +1,314 @@
+---
+title: '리액트 밖으로의 여행 - Ref로 DOM 직접 조작하기'
+publishedAt: '2025-08-25'
+summary: 'ref로 DOM 직접 제어: focus·scroll·forwardRef 사용'
+category: '개발'
+series: 'reactDocs'
+image: '/contents/posts/series/reactDocs/images/react-logo.svg'
+---
+
+## 들어가며
+
+이전 편에서는 `useRef` 훅을 활용하여 렌더링에 영향을 주지 않는 값을 저장하는 방법에 대해 알아보았습니다. `useRef`는 경우에 따라 실제 DOM 요소에 직접 접근하고 조작할 수 있는 기능을 제공하기도 합니다. 프론트엔드 개발에서 특정 상황에서는 DOM을 직접 제어해야 할 필요성이 발생할 수 있습니다. 예를 들어, 특정 `<input>` 요소에 자동으로 포커스를 주거나, 스크롤 위치를 프로그래밍 방식으로 조작하거나, 특정 요소에 직접 애니메이션을 적용해야 할 때가 그러합니다.
+
+리액트는 선언적 프로그래밍을 지향하며, 개발자가 직접 DOM을 조작하는 것을 일반적으로 권장하지 않습니다. 하지만 때로는 리액트의 추상화 계층만으로는 해결하기 어려운 문제들이 발생할 수 있습니다. 이럴 때 `ref`는 리액트의 '탈출구(Escape Hatch)' 역할을 하며, DOM에 대한 직접적인 제어권을 부여하는 방안이 될 수 있습니다.
+
+이번 편에서는 `ref`를 통해 React 컴포넌트 내부에서 어떻게 DOM 요소에 접근하고 조작할 수 있는지 그 방법과 실용적인 예시들을 살펴볼 예정입니다. 또한, 컴포넌트 간에 `ref`를 전달하는 `forwardRef` 패턴도 함께 알아볼 것입니다.
+
+## 리액트로 DOM 직접 조작 해보기 – useRef
+
+리액트는 일반적으로 DOM을 직접 조작하는 것을 권장하지 않지만, `ref`를 사용하면 필요한 경우 실제 DOM 요소에 접근할 수 있습니다. `useRef` 훅은 리액트 컴포넌트 내에서 `ref` 객체를 생성하고, 이 객체를 DOM 요소의 `ref` 속성에 할당함으로써 해당 DOM 요소에 대한 참조를 얻을 수 있게 해줍니다. 이 참조를 통해 `.current` 속성을 통해 실제 DOM 노드에 접근하고, 자바스크립트에서와 동일하게 `focus()`, `play()`, `scrollIntoView()`와 같은 DOM API를 호출할 수 있습니다.
+
+### 1) 입력 필드에 포커스 주기
+
+이 예제는 버튼 클릭 시 `input` 필드에 포커스를 주는 기능을 리액트로 구현한 것입니다. 여기서는 `useRef`를 사용하여 `input` 요소에 대한 `ref`를 생성하고, 버튼의 `onClick` 이벤트 핸들러에서 이 `ref`를 통해 `input` 요소에 포커스를 줍니다.
+
+```jsx
+import { useRef } from 'react';
+
+function FocusInputButton() {
+  const inputRef = useRef(null);
+
+  const handleClick = () => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
+  return (
+    <div>
+      <h3>입력 필드에 포커스 주기</h3>
+      <input type="text" ref={inputRef} placeholder="여기에 입력하세요" />
+      <button onClick={handleClick}>Input에 포커스</button>
+    </div>
+  );
+}
+
+export default FocusInputButton;
+```
+
+위 코드를 보면, `inputRef`라는 `ref`를 생성하고 이를 `input` 요소의 `ref` 속성에 연결했습니다. `handleClick` 함수 내부에서는 `inputRef.current`를 통해 실제 `input` DOM 요소에 접근하여 `focus()` 메서드를 호출합니다. 이 방식은 여전히 DOM을 직접 조작하는 것이지만, 리액트의 생명주기(Lifecycle) 내에서 안전하게 이루어지며 컴포넌트의 상태와는 별개로 관리됩니다. 특히 `useEffect` 훅과 함께 사용될 때, 컴포넌트가 마운트되거나 업데이트되는 특정 '생명주기 시점'에 맞춰 DOM 조작을 수행하는 강력한 시너지를 발휘합니다. (이에 대한 더 자세한 내용은 `5-3편` 및 `5-5편`에서 다룰 예정입니다.)
+
+### 2) 비디오 재생 및 일시정지 제어
+
+이 예제는 버튼 클릭으로 비디오를 재생하거나 일시정지하는 기능을 `useRef`를 사용하여 구현합니다. 비디오의 `play()`와 `pause()` 메서드를 직접 호출하여 제어합니다.
+
+```jsx
+import { useRef, useState } from 'react';
+
+function VideoPlayer() {
+  const videoRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  const handlePlay = () => {
+    if (videoRef.current) {
+      videoRef.current.play();
+      setIsPlaying(true);
+    }
+  };
+
+  const handlePause = () => {
+    if (videoRef.current) {
+      videoRef.current.pause();
+      setIsPlaying(false);
+    }
+  };
+
+  return (
+    <div>
+      <h3>비디오 재생 및 일시정지 제어</h3>
+      <video ref={videoRef} width="320" height="240" controls={false}>
+        <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4" />
+        <source src="https://www.w3schools.com/html/mov_bbb.ogg" type="video/ogg" />
+        브라우저가 비디오 태그를 지원하지 않습니다.
+      </video>
+      <div>
+        <button onClick={handlePlay} disabled={isPlaying}>
+          재생
+        </button>
+        <button onClick={handlePause} disabled={!isPlaying}>
+          일시정지
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default VideoPlayer;
+```
+
+여기서는 `videoRef`를 `<video>` 요소에 연결하고, `handlePlay`와 `handlePause` 함수에서 `videoRef.current.play()` 또는 `videoRef.current.pause()`를 호출하여 비디오를 제어합니다. `useState`를 사용하여 현재 재생 상태(`isPlaying`)를 UI에 반영합니다.
+
+### 3) 특정 요소로 스크롤 이동
+
+이 예제는 버튼 클릭 시 페이지 내의 특정 `div` 요소로 스크롤을 부드럽게 이동시키는 기능을 `useRef`를 사용하여 구현합니다.
+
+```jsx
+import { useRef } from 'react';
+
+function ScrollToElement() {
+  const targetRef = useRef(null);
+
+  const handleScrollClick = () => {
+    if (targetRef.current) {
+      targetRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  return (
+    <div>
+      <h3>특정 요소로 스크롤 이동</h3>
+      <button onClick={handleScrollClick}>아래 요소로 스크롤</button>
+      <div style={{ height: '1000px', background: '#f0f0f0', marginTop: '20px' }}>
+        페이지 내용 스크롤을 위한 더미 공간
+      </div>
+      <div
+        ref={targetRef}
+        style={{
+          height: '200px',
+          background: '#add8e6',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        스크롤될 목표 요소
+      </div>
+      <div style={{ height: '500px', background: '#f0f0f0' }}>추가 더미 공간</div>
+    </div>
+  );
+}
+
+export default ScrollToElement;
+```
+
+`targetRef`를 스크롤 목표 `div` 요소에 연결하고, `handleScrollClick` 함수에서 `targetRef.current.scrollIntoView({ behavior: "smooth" })`를 호출하여 부드러운 스크롤을 구현합니다.
+
+## `forwardRef`를 사용하여 Ref 전달하기
+
+때로는 부모 컴포넌트에서 자식 컴포넌트 내의 특정 DOM 요소에 `ref`를 직접 연결해야 하는 경우가 있습니다. 기본적으로 `ref`는 props처럼 전달되지 않습니다. `ref`는 특별한 속성이기 때문에 일반적인 props처럼 전달하려고 하면 에러가 발생하거나 의도대로 동작하지 않을 수 있습니다. 이럴 때 `React.forwardRef`를 사용하면 부모 컴포넌트에서 전달된 `ref`를 자식 컴포넌트의 DOM 요소에 '전달(forwarding)'할 수 있습니다. 이는 재사용 가능한 컴포넌트를 만들거나, 고차 컴포넌트(HOC)에서 래핑된 컴포넌트의 DOM에 접근해야 할 때 매우 유용하게 사용됩니다.
+
+`forwardRef`는 컴포넌트를 인자로 받아 새로운 컴포넌트를 반환하는 고차 함수입니다. 이 고차 함수가 반환하는 컴포넌트는 `props` 외에 두 번째 인자로 `ref`를 받을 수 있게 되며, 이 `ref`를 내부의 DOM 요소에 할당할 수 있습니다. 이렇게 함으로써 부모 컴포넌트는 자식 컴포넌트 내부의 DOM 요소에 직접 접근할 수 있는 '권한'을 얻게 되는 것이라고 생각합니다.
+
+다음 예제는 `MyInput`이라는 자식 컴포넌트에서 `input` 요소에 `ref`를 연결하고, 이 `ref`를 부모 컴포넌트인 `App`에서 사용할 수 있도록 `forwardRef`를 적용한 것입니다.
+
+### 파일 구조
+
+```text
+src/
+├── components/
+│   └── MyInput.jsx
+└── App.jsx
+```
+
+### `src/components/MyInput.jsx` (Ref를 전달받는 자식 컴포넌트)
+
+```jsx
+import React, { forwardRef } from 'react';
+
+// MyInput 컴포넌트를 forwardRef로 감싸 ref를 전달할 수 있도록 합니다.
+const MyInput = forwardRef((props, ref) => {
+  return (
+    <input
+      type="text"
+      ref={ref}
+      placeholder={props.placeholder}
+      style={{ padding: '8px', border: '1px solid #ccc' }}
+    />
+  );
+});
+
+export default MyInput;
+```
+
+`MyInput` 컴포넌트는 `forwardRef` 고차 함수로 감싸져 있습니다. 이로 인해 `props` 외에 두 번째 인자로 `ref`를 받을 수 있게 됩니다. 이 `ref`는 내부의 `<input>` 요소에 할당되어, 부모 컴포넌트가 `MyInput` 컴포넌트 내부의 실제 `DOM` 요소에 직접 접근할 수 있도록 하는 '권한'을 부여하는 역할을 합니다. 이러한 패턴은 재사용 가능한 컴포넌트를 만들면서도, 필요한 경우 특정 `DOM` 조작을 외부에서 가능하게 할 때 유용합니다.
+
+### `src/App.jsx` (부모 컴포넌트)
+
+```jsx
+import React, { useRef } from 'react';
+import MyInput from './components/MyInput';
+
+function App() {
+  const inputRef = useRef(null);
+
+  const handleClick = () => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
+  return (
+    <div>
+      <h3>`forwardRef`로 자식 컴포넌트의 Input 제어하기</h3>
+      <MyInput ref={inputRef} placeholder="자식 컴포넌트의 Input" />
+      <button onClick={handleClick}>자식 Input에 포커스</button>
+    </div>
+  );
+}
+
+export default App;
+```
+
+`App` 컴포넌트에선 `useRef` 훅을 사용하여 `inputRef`를 생성하고, 이를 `MyInput` 컴포넌트에 `ref` prop으로 전달합니다. 사용자가 "자식 Input에 포커스" 버튼을 클릭하면 `handleClick` 함수가 호출되고, `inputRef.current.focus()`를 통해 `MyInput` 내부에 있는 `<input>` 요소에 직접 포커스를 주는 방식으로 동작합니다. 이는 부모 컴포넌트가 자식 컴포넌트의 특정 `DOM` 요소에 명령형으로 접근하여 제어하는 전형적인 `forwardRef` 활용 사례를 보여줍니다.
+
+## React 19에서의 `ref` 전달 방식 변화
+
+리액트 19 버전부터는 `forwardRef`를 명시적으로 사용할 필요 없이, 함수형 컴포넌트에서 `ref`를 일반 `props`처럼 직접 전달할 수 있도록 변경되었습니다. 이러한 변화는 `ref` 전달 패턴을 더욱 간결하게 만들고, `forwardRef`라는 고차 함수를 사용해야 하는 복잡성을 줄여주는 것으로 생각됩니다.
+
+`forwardRef`는 리액트 19에서 더 이상 권장되지 않지만, 기존 코드와의 호환성을 위해 현재는 기능이 유지됩니다. 그러나 향후 버전에서는 완전히 제거될 가능성이 있으므로, 새로운 방식으로의 전환을 점진적으로 고려하는 것이 중요합니다.
+
+예를 들어, 위 `MyInput` 컴포넌트와 `App` 컴포넌트는 리액트 19 이후 다음과 같이 변경되었습니다.
+
+### `src/components/MyInput.jsx` (React 19 이후 Ref를 전달받는 자식 컴포넌트)
+
+```jsx
+const MyInput = ({ ref, ...props }) => {
+  return (
+    <input
+      type="text"
+      ref={ref}
+      placeholder={props.placeholder}
+      style={{ padding: '8px', border: '1px solid #ccc' }}
+    />
+  );
+};
+
+export default MyInput;
+```
+
+리액트 19 버전부터는 `forwardRef`를 명시적으로 사용하지 않고도, 함수형 컴포넌트에서 `ref`를 일반 `props`처럼 직접 받을 수 있게 됩니다. 위 `MyInput` 컴포넌트에서는 `ref`를 구조 분해 할당을 통해 직접 `props`로 받아 `<input>` 요소에 할당하고 있습니다. 이러한 변화는 `ref` 전달 패턴을 더욱 간결하고 직관적으로 만들어서 개발 복잡도를 줄이는 데 기여합니다.
+
+### `src/App.jsx` (React 19 이후 부모 컴포넌트)
+
+```jsx
+import React, { useRef } from 'react';
+import MyInput from './components/MyInput'; // MyInput 컴포넌트 임포트
+
+function App() {
+  const inputRef = useRef(null);
+
+  const handleClick = () => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
+  return (
+    <div>
+      <h3>React 19에서 `ref` 전달 방식</h3>
+      <MyInput ref={inputRef} placeholder="자식 컴포넌트의 Input" />
+      <button onClick={handleClick}>자식 Input에 포커스</button>
+    </div>
+  );
+}
+
+export default App;
+```
+
+`App` 컴포넌트에서는 이전과 동일하게 `useRef`를 사용하여 `inputRef`를 생성하고, 이를 `MyInput` 컴포넌트에 `ref` prop으로 전달합니다. 달라진 점은 `MyInput` 컴포넌트가 `forwardRef`로 감싸져 있지 않더라도 `ref`를 일반 `prop`처럼 자연스럽게 받아 처리할 수 있다는 것입니다. 이는 리액트 19에서 `ref` 전달 방식이 더욱 유연해졌음을 보여주며, 코드의 가독성과 작성 편의성을 향상시키는 데 도움이 됩니다.
+
+## Ref 사용 시점 및 주의사항
+
+`ref`는 강력한 도구이지만, 리액트의 선언적 패러다임과 단방향 데이터 흐름을 우회하는 '탈출구'이므로 신중하게 사용해야 합니다. `ref`가 꼭 필요한 상황에서만 사용하고, 남용하지 않도록 주의해야 합니다. `ref`를 통한 직접적인 DOM 조작은 리액트의 제어 흐름에서 벗어나는 예외적인 경우에 사용되며, 그 사용의 적절성을 항상 고민해야 한다고 생각합니다.
+
+**`ref` 사용이 적절한 경우:**
+
+- **DOM 요소에 포커스, 텍스트 선택, 미디어 재생 제어**: `<input>`에 자동으로 포커스를 주거나, `<video>`를 재생/일시정지하는 등 사용자 인터랙션과 관련된 직접적인 DOM 조작이 필요한 경우에 유용할 수 있습니다.
+- **애니메이션 직접 트리거**: 복잡하거나 고성능을 요구하는 애니메이션 라이브러리와 연동하여 DOM을 직접 제어할 때 도움이 될 수 있습니다.
+- **서드파티 DOM 라이브러리 연동**: jQuery, D3.js, Chart.js 등 DOM을 직접 조작하는 외부 라이브러리를 리액트 컴포넌트 내에서 사용할 때, 해당 라이브러리가 DOM 요소에 접근할 수 있도록 `ref`를 통해 실제 DOM 인스턴스를 전달할 수 있습니다.
+- **측정 가능한 DOM 크기나 위치**: 요소의 크기나 위치를 측정하여 UI 레이아웃을 동적으로 조정할 필요가 있을 때 활용될 수 있습니다.
+
+**`ref` 사용을 피해야 하는 경우 (대신 상태나 Props를 고려):**
+
+- **선언적으로 해결 가능한 문제**: UI의 대부분의 변화는 상태(state)를 통해 데이터를 변경하고, 리액트가 이를 기반으로 UI를 자동으로 업데이트하도록 하는 것이 가장 좋은 방법입니다. 예를 들어, 요소의 스타일을 변경해야 한다면 `ref`로 직접 스타일을 조작하기보다 상태를 통해 클래스나 인라인 스타일을 변경하는 것을 고려하는 것이 좋습니다.
+- **컴포넌트 간의 일반적인 데이터 흐름**: 부모-자식 컴포넌트 간의 데이터 전달은 `props`를 사용하는 것이 원칙입니다. `ref`를 통해 자식 컴포넌트의 상태를 직접 조작하거나, 자식 컴포넌트의 메서드를 호출하는 것은 피해야 한다고 생각합니다.
+
+`ref`의 `.current` 속성은 컴포넌트의 `렌더링`이 완료된 '커밋(Commit)' 단계에서 비로소 실제 DOM 노드를 가리키게 됩니다. 따라서 렌더링 중에 `ref.current`에 접근하여 조작하는 것은 예상치 못한 사이드 이펙트를 발생시킬 수 있으므로 주의해야 합니다. 일반적으로 `ref`를 통한 DOM 조작은 이벤트 핸들러나 `useEffect` 훅 내부에서 수행하는 것이 안전합니다. `useEffect` 훅에 대한 더 자세한 내용은 다음 편인 5-3편에서 다룰 예정입니다. 이처럼 `ref`를 통한 직접적인 DOM 조작은 리액트의 제어 흐름에서 벗어나는 예외적인 경우에 사용되며, 그 사용의 적절성을 항상 고민해야 한다고 생각합니다.
+
+## Ref를 활용한 DOM 직접 조작의 특성
+
+리액트에서 `ref`를 사용하여 DOM을 직접 조작하는 방식은 다음과 같은 독특한 특징들을 가집니다.
+
+- **1. 제한적이고 명시적인 DOM 접근**: `ref`를 통한 DOM 접근은 리액트의 선언적 패러다임에서 벗어나는 '탈출구'로 간주될 수 있습니다. 리액트는 대부분의 UI 업데이트를 상태 변화에 기반한 효율적인 방식으로 처리하기 때문에 직접적인 DOM 조작의 필요성을 줄여줍니다. 따라서 `useRef` 훅을 통해 `ref` 객체를 명시적으로 생성하고 DOM 요소에 연결하는 방식은, 꼭 필요한 상황에 한해 리액트의 통제권을 잠시 벗어나 명령형으로 DOM에 접근하는 절충적인 방법이라고 이해할 수 있습니다.
+- **2. 선언적 UI와 명령형 DOM 조작의 공존**: 리액트 컴포넌트는 상태에 기반한 선언적인 방식으로 UI를 렌더링합니다. 이는 '무엇을 보여줄지'를 선언하면 리액트가 '어떻게' 그 UI를 렌더링할지 결정하는 방식입니다. 하지만 `ref`를 사용하면 특정 이벤트 핸들러 내부에서 DOM을 명령형으로 조작할 수 있습니다. 예를 들어, 버튼 클릭 시 `inputRef.current.focus()`와 같이 특정 동작을 직접 지시합니다. 이는 선언적 흐름 속에서 필요한 순간에만 DOM의 상세 제어권을 얻는 방식으로, 리액트의 큰 틀 안에서 유연성을 확보하는 방법이라고 볼 수 있습니다.
+- **3. 리액트 생명주기 내에서의 안전한 조작**: `ref.current`는 컴포넌트의 렌더링이 완료된 '커밋(Commit)' 단계, 즉 컴포넌트가 화면에 마운트된 후에야 실제 DOM 노드를 가리키게 됩니다. 따라서 `ref`를 통한 DOM 조작은 리액트의 업데이트 과정에 직접적인 영향을 주지 않으면서, 컴포넌트의 '생명주기(Lifecycle) 시점'에 맞춰 이벤트 핸들러나 `useEffect` 훅 내부에서 안전하게 실행될 수 있습니다. 특히 `useEffect`는 `ref`를 통한 명령형 DOM 조작을 컴포넌트의 마운트, 업데이트, 언마운트와 같은 특정 생명주기 시점에 맞춰 수행하는 데 적합한 도구입니다. (관련 내용은 `5-3편`과 `5-5편`에서 더 자세히 다룹니다.)
+- **4. `forwardRef`를 통한 `ref` 전달의 목적**: 컴포넌트의 재사용성을 높이기 위해, 부모 컴포넌트에서 자식 컴포넌트의 DOM 요소에 `ref`를 연결해야 할 때 `React.forwardRef`를 사용하여 `ref`를 전달합니다. 이는 자식 컴포넌트가 자신의 내부 DOM 요소를 부모에게 노출시키는 메커니즘으로, 컴포넌트 계층 구조 내에서 DOM 요소에 대한 접근성을 유지하면서 컴포넌트의 캡슐화를 침해하지 않는 방식으로 특정 제어 권한을 부모에게 부여하는 것이라고 이해할 수 있습니다.
+- **5. 신중한 사용 권장**: `ref`를 이용한 DOM 직접 조작은 강력한 도구이지만, 리액트의 핵심 철학인 선언적 UI와 단방향 데이터 흐름을 위배할 위험이 있습니다. 따라서 `ref`는 애니메이션, 미디어 제어, 서드파티 라이브러리 연동 등 리액트의 상태나 `props`만으로는 해결하기 어려운 '예외적인' 시나리오에서만 신중하게 사용하는 것이 중요하다고 생각합니다. 대부분의 UI 업데이트는 리액트의 상태 관리 시스템을 통해 선언적으로 처리하는 것이 애플리케이션의 예측 가능성과 유지보수성을 높이는 가장 좋은 방법인 것 같습니다.
+
+이러한 특징들을 고려할 때, `ref`는 리액트 개발자가 마주하는 특정 문제들을 해결하기 위한 필수적인 도구이지만, 그 사용은 항상 '왜 지금 `ref`가 필요한가?'라는 질문과 함께 고민되어야 한다고 봅니다.
+
+## 요약
+
+이전 섹션에서 `ref`를 사용하여 리액트 컴포넌트 내부에서 실제 DOM 요소에 직접 접근하고 조작하는 다양한 방법과 그 활용 사례를 살펴보았습니다. 리액트의 선언적 패러다임이 대부분의 UI 문제를 해결하지만, 특정 상황에서는 `ref`와 같은 '탈출구'가 필요하다는 것을 이해하는 것이 중요하다고 생각합니다.
+
+- **`ref`의 역할**: DOM/인스턴스 직접 접근 도구, `useRef`로 생성, `.current`로 요소 접근
+- **주요 활용**: 포커스/미디어 제어, 서드파티 라이브러리 연동 (명령형 작업)
+- **`forwardRef`**: 부모->자식 `ref` 전달 패턴 (재사용성/유연성 향상)
+- **신중한 사용**: 리액트 철학 위배 가능성, 필요한 경우에만 제한적 사용 권장 (선언적 처리 우선)
+
+이번 편을 통해 `ref`가 리액트가 제공하는 강력한 추상화 뒤편에 존재하는 실제 DOM 조작의 가능성과 그 한계를 탐색했습니다. `ref`를 올바르게 이해하고 적절하게 활용한다면, 리액트 애플리케이션에서 더욱 다양한 인터랙션과 기능을 구현할 수 있을 것이라고 생각합니다.
+
+## 참고문서
+
+– [[ref로 DOM 조작하기 (Manipulating the DOM with Refs)](https://ko.react.dev/learn/manipulating-the-dom-with-refs)]

@@ -1,0 +1,243 @@
+---
+title: '이벤트는 즉시, Effect는 동기화 - 역할 분리하기'
+publishedAt: '2025-08-29'
+summary: '이벤트는 즉시, Effect는 동기화: 역할 분리 원칙'
+category: '개발'
+series: 'reactDocs'
+image: '/contents/posts/series/reactDocs/images/react-logo.svg'
+---
+
+## 들어가며
+
+이전 편들(`5-3편`, `5-4편`, `5-5편`)에서 우리는 `useEffect` 훅이 리액트 컴포넌트와 브라우저 DOM, 네트워크 등 **외부 시스템 간의 동기화**를 위한 강력한 도구임을 학습했습니다. 하지만 모든 종류의 "사이드" 작업이 `useEffect`에 적합한 것은 아니며, 특히 **사용자 인터랙션(이벤트)에 직접적으로 반응하는 로직**은 `useEffect`의 역할과 분명한 차이가 있습니다.
+
+이번 편에서는 이벤트 핸들러의 본질적인 역할과 `useEffect`의 역할을 명확히 구분하고, 이 둘의 경계를 올바르게 설정하는 것이 왜 중요한지 심층적으로 탐구합니다. 이를 통해 불필요한 `Effect`의 재실행을 방지하고 코드의 예측 가능성, 가독성, 그리고 유지보수성을 향상시키는 방법을 저의 학습 여정 속에서 공유하고자 합니다.
+
+## 이벤트 핸들러의 역할: 사용자 액션에 대한 즉각적인 반응
+
+이벤트 핸들러는 사용자의 클릭, 입력, 제출 등 직접적인 UI 인터랙션에 응답하여 실행되는 코드 블록입니다. 중요한 점은 이러한 핸들러가 이벤트 발생 즉시, 리액트의 렌더링 사이클이 시작되기 전에 실행된다는 것입니다. 이 덕분에 이벤트 핸들러는 사용자 액션에 대한 가장 빠른 피드백을 제공할 수 있는 지점이라고 할 수 있습니다.
+
+주로 리액트 내부의 상태를 업데이트하여 UI 변경을 트리거하거나, 폼 유효성 검사 및 제출과 같은 사용자 주도 액션을 처리하고, 즉각적인 사용자 피드백(예: 로딩 스피너 활성화, 알림 메시지 표시), 그리고 애플리케이션 내부 라우팅 변경 등에 사용될 수 있습니다. 버튼 클릭 시 카운터를 증가시키는 간단한 예제를 통해 이벤트 핸들러가 즉시 상태를 업데이트하는 과정을 살펴보겠습니다.
+
+```jsx
+import { useState } from 'react';
+
+function CounterButton() {
+  const [count, setCount] = useState(0);
+
+  const handleClick = () => {
+    setCount(count + 1); // Event Handler: 사용자 클릭에 즉시 반응하여 상태 업데이트
+    console.log(`버튼 클릭됨! 현재 카운트 (업데이트 전): ${count}`); // 즉시 실행되는 로직
+  };
+
+  return (
+    <div>
+      <p>현재 카운트: {count}</p>
+      <button onClick={handleClick}>카운트 증가</button>
+    </div>
+  );
+}
+export default CounterButton;
+```
+
+`CounterButton` 컴포넌트에서 `handleClick` 함수는 `onClick` 이벤트 발생 시 즉시 `setCount`를 호출하여 상태를 업데이트하고, 이로 인해 다음 렌더링이 유도됩니다. `console.log`가 버튼 클릭과 거의 동시에 나타나는 것을 통해 이벤트 핸들러의 즉각적인 실행 특성을 확인할 수 있습니다.
+
+## Effect의 역할: 렌더링 이후 외부 시스템과의 동기화
+
+`useEffect`는 컴포넌트의 렌더링이 완료되고 DOM에 반영된 후에 실행되어, 리액트 컴포넌트 내부의 상태를 브라우저 DOM, 네트워크, 구독 서비스 등 **React 외부 시스템과 동기화하는 도구**입니다. 이 시점은 UI가 사용자에게 보여진 후에 외부 시스템과의 정합성을 맞추는 역할에 적합하며, `Effect`는 **렌더링 후에 실행되는 동기화 로직**이라는 점을 기억하는 것이 중요합니다.
+
+## 이벤트 핸들러와 `Effect` 역할 분리 원칙: `Event → State → Render → Commit → Effect` 흐름
+
+이벤트 핸들러와 `Effect`의 역할을 명확히 구분하는 핵심 원칙은 리액트의 자연스러운 데이터 흐름인 `Event → State → Render → Commit → Effect`를 이해하는 것입니다.
+
+- **사용자 인터랙션(Event)**: 사용자의 클릭, 입력 등 즉각적인 액션에 반응하여 리액트 내부의 상태를 변경하거나 사용자에게 즉각적인 피드백을 제공합니다. 이벤트 핸들러는 `setState`를 호출하여 컴포넌트의 상태를 업데이트하고 다음 렌더링을 유도합니다.
+- **State (상태)**: 이벤트 핸들러에 의해 `setState`가 호출되면, 리액트 컴포넌트의 상태가 업데이트됩니다. 이 상태는 UI의 다음 렌더링을 결정하는 핵심 정보가 됩니다.
+- **Render (렌더)**: 업데이트된 `State`를 기반으로 컴포넌트 함수가 다시 실행되어, 가상 DOM(Virtual DOM) 형태의 새로운 UI 스냅샷을 생성합니다. 이 단계에서 리액트는 실제 DOM에 어떤 변경이 필요한지 계산합니다.
+- **Commit (커밋)**: 리액트가 렌더 단계에서 계산된 UI 변경사항을 실제 브라우저 DOM에 적용합니다. 이 과정에서 화면에 새로운 UI가 나타나거나 기존 UI가 업데이트됩니다.
+- **Effect (이펙트)**: `Commit` 단계가 완료되어 실제 DOM이 업데이트된 **이후에** `useEffect`에 정의된 함수가 실행됩니다. 이 시점에서 `Effect`는 외부 시스템(브라우저 DOM, 네트워크, 구독 등)과 React 상태를 동기화하는 작업을 수행합니다.
+
+이러한 흐름을 따르지 않고, 이벤트 핸들러에서 직접 처리해야 할 로직을 `Effect`의 의존성(예: `triggerSave` 플래그 상태)으로 넣어서 `Effect`를 '트리거'하는 것은 리액트의 자연스러운 데이터 흐름을 왜곡하고 책임 영역을 혼동하는 잘못된 패턴입니다. 이는 불필요한 상태 및 렌더링 오버헤드를 유발할 수 있습니다.
+
+### 잘못된 패턴 분석: 이벤트 로직을 Effect로 트리거하기
+
+다음은 사용자의 '저장' 버튼 클릭이라는 이벤트 로직을 `useEffect`의 의존성으로 '트리거'하는 잘못된 예시입니다.
+
+```jsx
+import { useState, useEffect } from 'react';
+
+function BadSaveExample() {
+  const [inputValue, setInputValue] = useState('');
+  const [hasChanges, setHasChanges] = useState(false); // 변경사항 존재 여부
+  const [triggerSave, setTriggerSave] = useState(false); // 저장 액션 트리거용 플래그
+
+  useEffect(() => {
+    if (triggerSave) {
+      console.log('Effect 내부: 데이터 저장 로직 실행');
+      // 실제 저장 로직 (가상의 API 호출)
+      setTimeout(() => {
+        alert('데이터 저장 완료! (Effect 내부)');
+        setHasChanges(false);
+        setTriggerSave(false); // 저장 플래그 초기화
+      }, 700);
+    }
+  }, [triggerSave]); // triggerSave가 변경될 때마다 Effect 실행
+
+  const handleInputChange = e => {
+    setInputValue(e.target.value);
+    setHasChanges(true);
+  };
+
+  const handleSaveButtonClick = () => {
+    if (hasChanges) {
+      setTriggerSave(true); // 버튼 클릭 시 저장 Effect를 트리거
+    } else {
+      alert('변경사항이 없습니다.');
+    }
+  };
+
+  return (
+    <div>
+      <input type="text" value={inputValue} onChange={handleInputChange} />
+      <p>변경사항: {hasChanges ? '있음' : '없음'}</p>
+      <button onClick={handleSaveButtonClick} disabled={!hasChanges}>
+        저장 (잘못된 Event/Effect 분리)
+      </button>
+    </div>
+  );
+}
+export default BadSaveExample;
+```
+
+이 `BadSaveExample`의 문제점은 다음과 같습니다.
+
+- **불필요한 상태 (`triggerSave`)**: '저장'이라는 '액션' 자체를 `state`로 관리하는 것은 비효율적이며, React의 상태 관리 철학과 맞지 않습니다. 상태는 '무엇이 보여져야 하는가'를 기술하는 데 사용되어야 합니다.
+- **제어 흐름의 왜곡**: 사용자 클릭(이벤트)이 `triggerSave` 상태를 변경하고, 이로 인해 리렌더링이 발생한 _후에_ `Effect`가 실행되는 지연된 로직 흐름은 직관적이지 않습니다.
+- **예측 불가능성**: `triggerSave` 상태가 어떤 이유로든 `true`가 되면 `Effect`가 실행될 수 있어, 예상치 못한 시점에 저장 로직이 반복되거나 실행될 위험이 있습니다.
+- **추가적인 렌더링 오버헤드**: `triggerSave` 상태 변경 자체가 불필요한 리렌더링을 유발하여 성능 저하로 이어질 수 있습니다.
+
+### 올바른 패턴 제시: 이벤트 핸들러 내에서 직접 Side Effect 처리하기
+
+사용자 인터랙션에 대한 로직, 특히 비동기 작업을 포함하는 로직은 이벤트 핸들러 내에서 직접 수행하는 것이 올바른 접근 방식입니다. 이는 React의 상태를 사용하여 UI를 업데이트하는 것과 동시에, 필요한 부수 효과를 즉시 처리할 수 있게 합니다.
+
+````jsx
+import { useState } from 'react';
+
+function GoodSaveExample() {
+  const [inputValue, setInputValue] = useState('');
+  const [hasChanges, setHasChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false); // 저장 중 UI 표시용 상태
+
+  const handleInputChange = e => {
+    setInputValue(e.target.value);
+    setHasChanges(true);
+  };
+
+  const handleSave = async () => {
+    if (!hasChanges || isSaving) return; // 변경사항 없거나 이미 저장 중이면 리턴
+
+    setIsSaving(true); // 저장 시작
+    console.log('Event Handler 내부: 데이터 저장 로직 실행');
+    try {
+      // 실제 저장 로직 (가상의 API 호출)
+      await new Promise(resolve => setTimeout(resolve, 700));
+      alert('데이터 저장 완료! (Event Handler 내부)');
+      setHasChanges(false); // 저장 후 변경사항 없음으로
+    } catch (error) {
+      console.error('저장 실패:', error);
+      alert('데이터 저장 실패!');
+    } finally {
+      setIsSaving(false); // 저장 종료
+    }
+  };
+
+  return (
+    <div>
+      <input type="text" value={inputValue} onChange={handleInputChange} />
+      <p>변경사항: {hasChanges ? '있음' : '없음'}</p>
+      <button onClick={handleSave} disabled={!hasChanges || isSaving}>
+        {isSaving ? '저장 중...' : '저장 (올바른 Event 처리)'}
+      </button>
+    </div>
+  );
+}
+export default GoodSaveExample;
+```
+
+`GoodSaveExample` 컴포넌트에서는 `handleSave` 이벤트 핸들러 내에서 사용자 클릭 시 직접 비동기 저장 로직을 수행합니다. `isSaving` 상태는 저장 중이라는 로딩 UI 피드백을 위해 존재하며, '저장'이라는 액션 자체를 `state`로 관리하지 않아 코드의 명확성과 효율성을 높입니다.
+
+## 구독 및 타이머 로직에서의 역할 분리 재확인
+
+`5-6편`에서 살펴보았던 `Stopwatch` 예제는 이벤트 핸들러와 `Effect`의 역할 분리를 명확하게 보여주는 또 다른 사례입니다. `Start/Stop` 버튼 클릭(이벤트)이 `isRunning` 상태를 변경하고, 이 `isRunning` 상태 변화에 따라 `useEffect`가 `setInterval`을 시작하거나 `clearInterval`로 정리(동기화)하는 과정을 통해 각각의 책임 영역을 확인할 수 있습니다.
+
+```jsx
+import { useState, useEffect } from 'react';
+
+function StopwatchComponent() {
+  const [seconds, setSeconds] = useState(0);
+  const [isRunning, setIsRunning] = useState(false);
+
+  // Effect: 외부 시스템(setInterval)과 isRunning 상태 동기화
+  useEffect(() => {
+    if (!isRunning) {
+      console.log('Effect: 타이머가 현재 실행 중이 아니므로 종료');
+      return;
+    }
+
+    console.log('Effect: 타이머 시작');
+    const intervalId = setInterval(() => {
+      setSeconds(prevSeconds => prevSeconds + 1);
+    }, 1000);
+
+    // 클린업 함수: isRunning 변경 또는 컴포넌트 언마운트 시 타이머 해제
+    return () => {
+      clearInterval(intervalId);
+      console.log('Effect: 타이머 정리');
+    };
+  }, [isRunning]); // isRunning 상태가 변경될 때마다 Effect 실행
+
+  // Event Handler: 사용자 액션에 따라 isRunning 상태 변경
+  const handleToggleRun = () => {
+    console.log('Event Handler: 타이머 실행/중지 버튼 클릭');
+    setIsRunning(!isRunning);
+  };
+
+  const handleReset = () => {
+    console.log('Event Handler: 타이머 초기화 버튼 클릭');
+    setIsRunning(false); // 실행 중이라면 중지
+    setSeconds(0); // 시간 초기화
+  };
+
+  return (
+    <div>
+      <p>경과 시간: {seconds}초</p>
+      <button onClick={handleToggleRun}>{isRunning ? '중지' : '시작'}</button>
+      <button onClick={handleReset}>초기화</button>
+    </div>
+  );
+}
+export default StopwatchComponent;
+````
+
+`StopwatchComponent`에서 `handleToggleRun` 및 `handleReset`은 사용자 클릭에 반응하여 `isRunning` 및 `seconds` 상태를 변경하는 **이벤트 핸들러**입니다. 반면 `useEffect`는 이 `isRunning` 상태의 변화에 반응하여 외부 시스템인 `setInterval`을 시작하거나 `clearInterval`로 정리하는 **동기화 역할**을 수행합니다. 이처럼 이벤트 핸들러는 '무엇을 할지' (상태 변경)를 결정하고, `Effect`는 '그 결과로 외부 시스템을 어떻게 동기화할지'를 담당하는 명확한 역할 분담을 보여줍니다.
+
+## `useEffect` 훅의 특징
+
+`useEffect` 훅은 리액트 컴포넌트의 생명주기와 외부 시스템과의 동기화를 관리하는 강력한 도구이며, 다음과 같은 특징을 가질 수 있습니다.
+
+1. **이벤트 핸들러와의 상호 보완적인 역할**: `useEffect`는 사용자 인터랙션(`Event Handler`)으로 발생한 `state` 변화가 `render`와 `commit` 과정을 거쳐 DOM에 반영된 **이후에 실행**되어, React 컴포넌트 내부의 상태와 브라우저 DOM, 네트워크, 구독 등 **외부 시스템을 동기화하는 역할**에 집중합니다. 이는 로직의 책임 영역을 명확히 하여 코드의 가독성과 예측 가능성을 높이는 데 기여합니다.
+2. **렌더링 후 동기화에 최적화**: `useEffect`는 컴포넌트의 렌더링 결과가 화면에 적용된 이후에 동작하므로, UI와 동떨어진 외부 시스템과의 상호작용 로직을 안전하고 효율적으로 처리할 수 있습니다. 이를 통해 컴포넌트의 렌더링 로직 자체는 순수하게 유지될 수 있으며, 외부 요인에 의한 복잡성을 분리하여 애플리케이션의 안정성을 높이는 데 도움이 될 수 있습니다.
+3. **불필요한 `Effect` 재실행 및 버그 방지**: 사용자 인터랙션에 직접 반응하는 로직을 `Effect` 내부에 '플래그 상태'와 함께 사용하는 것은 종종 불필요한 `Effect`의 재실행, 복잡한 의존성 관리, 그리고 예상치 못한 버그를 유발할 수 있습니다. `Effect`를 외부 시스템과의 동기화라는 본질적인 역할에 국한하여 사용함으로써, 이러한 문제들을 효과적으로 방지하고 더욱 견고하며 유지보수하기 쉬운 애플리케이션을 구축할 수 있습니다.
+
+## 요약
+
+`useEffect` 훅과 이벤트 핸들러의 역할 분리에 대해 심층적으로 살펴보았습니다. 이 둘의 명확한 경계를 이해하고 올바르게 활용하는 것이 리액트 애플리케이션의 예측 가능성과 유지보수성을 크게 향상시킬 수 있다는 점을 확인할 수 있었습니다. 다음은 이번 편의 핵심 내용들입니다.
+
+- **이벤트 핸들러의 역할**: 사용자 인터랙션에 즉각적으로 반응하여 리액트 내부 상태를 변경하는 데 집중합니다. 이는 `Event → State → Render` 흐름의 시작점입니다.
+- **`Effect`의 역할**: 리액트 상태 변화로 인한 렌더링이 완료된 후, 외부 시스템(DOM, 네트워크 등)과 React 상태를 동기화하는 데 집중합니다. 이는 `Render → Effect` 흐름의 동기화 책임 영역입니다.
+- **역할 분리 원칙**: `Event → State → Render → Commit → Effect`라는 리액트의 자연스러운 데이터 흐름을 따르며, 사용자 인터랙션 로직을 `Effect`로 '트리거'하는 잘못된 패턴을 피해야 합니다.
+- **잘못된 패턴**: 이벤트 로직을 `Effect`의 의존성에 포함된 플래그 상태로 제어하는 것은 불필요한 상태, 제어 흐름 왜곡, 예측 불가능성, 그리고 렌더링 오버헤드를 유발할 수 있습니다.
+- **올바른 패턴**: 사용자 인터랙션에 대한 `Side Effect`(특히 비동기 작업)는 이벤트 핸들러 내에서 직접 처리하고, `Effect`는 오직 외부 시스템과의 동기화에만 사용합니다.
+
+## 참고문서
+
+– [[Effect에서 이벤트 분리하기](https://ko.react.dev/learn/separating-events-from-effects)]

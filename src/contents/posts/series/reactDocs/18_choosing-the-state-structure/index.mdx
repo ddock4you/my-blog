@@ -1,0 +1,220 @@
+---
+title: '상태 설계의 원칙 - 효율적인 State 구조 만들기'
+publishedAt: '2025-08-18'
+summary: '상태 구조 설계: 최소 상태·SSOT·파생값 계산 원칙'
+category: '개발'
+series: 'reactDocs'
+image: '/contents/posts/series/reactDocs/images/react-logo.svg'
+---
+
+## 들어가며
+
+우리는 그동안 이벤트, 상태의 스냅샷, 큐잉, 배치 업데이트, 불변성 같은 기반을 차근히 지나왔습니다. 이제는 한 단계 올라가, “상태를 어떻게 설계할 것인가”라는 질문으로 방향을 옮겨 보려 합니다. 상태는 많다고 좋은 것이 아니고, 적다고 항상 옳은 것도 아닌 것 같습니다. 중요한 것은 “최소한으로, 모순 없이, 중복 없이, 그리고 유지보수가 쉬운 형태”로 설계하는 일입니다. 이 편에서는 리액트 공식문서의 원칙들을 바탕으로, 바닐라 자바스크립트에서 흔히 겪는 상태 설계의 함정들을 정리하고 리액트에서의 권장 패턴으로 재구성해 보겠습니다. 구현 자체보다 “구조”에 초점을 맞추어 생각의 기준을 세우는 시간이 되었으면 합니다.
+
+## 최소 상태와 파생 상태(Derived State)
+
+자바스크립트엔 없는 리액트의 특징부터 짚고 가면 이해가 편했습니다. 리액트는 “렌더링 시점에 계산 가능한 값은 굳이 상태로 들고 있지 말라”는 철학을 강하게 권합니다. 이는 다음의 원칙들로 정리할 수 있습니다.
+
+- 최소 상태(Keep the state minimal): 화면을 그리는 데 꼭 필요한 사실(facts)만 저장합니다.
+- SSOT(Single Source of Truth): 동일한 정보를 여러 곳에 중복 저장하지 않습니다.
+- 파생 상태는 계산(Derived, not stored): 길이, 합계, 필터링 결과처럼 입력으로부터 계산 가능한 값은 렌더링 중 계산합니다.
+- 독립 값은 분리(Separate independent state): 서로 영향을 주지 않는 값은 같은 객체로 묶지 말고 각각의 상태로 관리합니다.
+- 깊은 중첩 피하기(Prefer flat structures): 중첩이 깊어질수록 업데이트 경로가 복잡해지고 실수가 잦아집니다.
+
+이제 이 원칙을 하나의 예제로 연결해 보겠습니다.
+
+## 자바스크립트로 “제품 필터” 만들기
+
+먼저 우리가 늘 사용해온 방식으로, 검색어와 “재고만 보기” 옵션에 따라 목록을 필터링하는 간단한 UI를 만들어 보겠습니다. 의도적으로 “필터링된 결과”를 별도 상태로 들고 있어 중복과 동기화 책임이 생기는 구조를 선택했습니다.
+
+```html
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vanilla JS - 제품 필터</title>
+  </head>
+  <body>
+    <h1>제품 필터 (JavaScript)</h1>
+
+    <label>
+      검색어:
+      <input id="searchInput" type="text" placeholder="제품명을 입력" />
+    </label>
+    <label style="margin-left: 8px;">
+      <input id="inStockOnly" type="checkbox" /> 재고만 보기
+    </label>
+
+    <p id="summary"></p>
+    <ul id="list"></ul>
+
+    <script>
+      (function () {
+        const products = [
+          { id: 1, name: "키보드", inStock: true },
+          { id: 2, name: "마우스", inStock: false },
+          { id: 3, name: "모니터", inStock: true },
+          { id: 4, name: "웹캠", inStock: true },
+          { id: 5, name: "헤드셋", inStock: false },
+        ];
+
+        let searchTerm = "";
+        let inStockOnly = false;
+        // 의도적 중복 상태: 파생 값인데 별도로 저장함
+        let filteredProducts = products.slice();
+
+        const input = document.getElementById("searchInput");
+        const checkbox = document.getElementById("inStockOnly");
+        const list = document.getElementById("list");
+        const summary = document.getElementById("summary");
+
+        function applyFilter() {
+          filteredProducts = products.filter((p) => {
+            const matches = p.name.includes(searchTerm);
+            const stockOk = inStockOnly ? p.inStock : true;
+            return matches && stockOk;
+          });
+          render();
+        }
+
+        function render() {
+          list.innerHTML = "";
+          filteredProducts.forEach((p) => {
+            const li = document.createElement("li");
+            li.textContent = `${p.name}${p.inStock ? "" : " (품절)"}`;
+            list.appendChild(li);
+          });
+          summary.textContent = `총 ${filteredProducts.length}개`;
+        }
+
+        input.addEventListener("input", function () {
+          searchTerm = this.value.trim();
+          applyFilter(); // 상태 변경 후 수동 동기화
+        });
+
+        checkbox.addEventListener("change", function () {
+          inStockOnly = this.checked;
+          applyFilter(); // 상태 변경 후 수동 동기화
+        });
+
+        // 초기 렌더링
+        applyFilter();
+      })();
+    </script>
+  </body>
+</html>
+```
+
+위 코드의 핵심은 “필터링된 결과”를 별도의 상태(`filteredProducts`)로 들고 있다는 점입니다. 겉보기에는 편하지만, 입력값(`searchTerm`, `inStockOnly`)과 결과가 항상 일관되도록 유지하려면 매번 `applyFilter()`를 잊지 말아야 합니다. 다른 코드 경로에서 한 번만 빠져도 상태가 서로 어긋나기 쉽습니다.
+
+### 자바스크립트 방식의 특징
+
+1. **결과를 따로 들고 있음**: `filteredProducts`처럼 “결과”를 별도 변수에 저장합니다. 그래서 `searchTerm`이나 `inStockOnly`가 바뀔 때마다 `applyFilter()`를 직접 호출해 값을 다시 맞춰줘야 합니다.
+2. **화면 갱신도 직접**: `render()`에서 `list.innerHTML = ""`로 비우고, `<li>`를 만들어 `appendChild`로 붙입니다. 데이터가 바뀌면 개발자가 화면도 직접 바꿔 줘야 합니다.
+3. **실수에 취약**: 한 번만 `applyFilter()` 호출을 빼먹어도 목록과 요약(`summary.textContent`)이 실제 값과 달라질 수 있습니다.
+4. **구조가 커질수록 복잡**: 관련 값을 한 객체/함수 안에 계속 얹다 보면 중첩과 의존이 깊어져, 어디서 어긋났는지 찾기 어려워집니다.
+5. **디버깅 비용 증가**: “왜 갯수가 틀리지?”를 확인하려면 입력값 → 필터 로직 → DOM 갱신 순서를 모두 추적해야 합니다.
+
+## 리액트로 동일한 “제품 필터” 만들기
+
+이제 리액트 버전으로 넘어가 보겠습니다. 파생 가능한 값은 저장하지 않고, 최소한의 사실만 상태로 둡니다. 목록은 렌더링 단계에서 계산합니다.
+
+```jsx
+import { useState } from 'react';
+
+const PRODUCTS = [
+  { id: 1, name: '키보드', inStock: true },
+  { id: 2, name: '마우스', inStock: false },
+  { id: 3, name: '모니터', inStock: true },
+  { id: 4, name: '웹캠', inStock: true },
+  { id: 5, name: '헤드셋', inStock: false },
+];
+
+function ProductFilter() {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [inStockOnly, setInStockOnly] = useState(false);
+
+  const t = searchTerm.trim();
+  const filteredProducts = PRODUCTS.filter(p => {
+    const matches = p.name.includes(t);
+    const stockOk = inStockOnly ? p.inStock : true;
+    return matches && stockOk;
+  });
+
+  return (
+    <div>
+      <h1>제품 필터 (React)</h1>
+
+      <label>
+        검색어:
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+          placeholder="제품명을 입력"
+        />
+      </label>
+      <label style={{ marginLeft: 8 }}>
+        <input
+          type="checkbox"
+          checked={inStockOnly}
+          onChange={e => setInStockOnly(e.target.checked)}
+        />
+        재고만 보기
+      </label>
+
+      <p>총 {filteredProducts.length}개</p>
+      <ul>
+        {filteredProducts.map(p => (
+          <li key={p.id}>
+            {p.name}
+            {p.inStock ? '' : ' (품절)'}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export default ProductFilter;
+```
+
+위 코드에서 상태는 `searchTerm`, `inStockOnly` 두 개뿐입니다. 리스트는 매 렌더링마다 입력을 기준으로 계산합니다. “파생 상태를 저장하지 않는다”는 원칙이 그대로 반영된 구조입니다. 값이 단순해진 만큼, 동기화 책임도 리액트의 렌더링 사이클로 자연스럽게 이동합니다.
+
+### 리액트 방식의 특징 (State 구조 선택)
+
+- **1. 최소 상태(Minimal State) 유지의 중요성**: 리액트는 '화면을 그리는 데 꼭 필요한 최소한의 사실(facts)'만을 상태로 저장할 것을 강력히 권장합니다. 이는 불필요한 데이터를 상태로 관리하여 발생하는 오버헤드를 줄이고, 상태 변화의 파급 효과를 예측 가능하게 만듭니다. 예를 들어, `filteredProducts`처럼 다른 상태로부터 충분히 파생될 수 있는 값은 별도의 상태로 두지 않고, 렌더링 시점에 계산하여 사용함으로써 상태 구조를 간결하게 유지합니다.
+- **2. SSOT(Single Source of Truth) 확립**: 동일한 정보는 여러 곳에 중복 저장하지 않고, 오직 한 곳에서만 관리해야 한다는 원칙입니다. `filteredProducts` 예시처럼, 필터링된 결과는 `searchTerm`과 `inStockOnly`라는 두 가지 최소 상태로부터 계산되므로, 이를 별도의 상태로 두면 데이터 중복과 불일치 가능성이 생깁니다. SSOT를 통해 상태의 일관성을 확보하고, 데이터 변경 시 추적 및 디버깅을 용이하게 합니다.
+- **3. 파생 상태(Derived State)의 효율적인 계산**: 길이, 합계, 필터링 결과 등 기존 상태로부터 계산 가능한 값들은 렌더링 단계에서 즉시 계산하여 사용합니다. 이는 상태를 최소화하고 중복을 피하는 핵심 전략입니다. 파생 상태를 별도의 상태로 저장하지 않음으로써, 상태 동기화에 대한 개발자의 부담을 줄이고 리액트의 렌더링 메커니즘이 자동으로 UI를 최신 상태로 유지하도록 합니다.
+- **4. 독립적인 값의 분리와 얕은 구조 선호**: 서로 독립적으로 변경되거나 영향을 주지 않는 값들은 하나의 객체로 묶기보다는 각각의 독립적인 상태(`useState`)로 관리하는 것을 권장합니다. 또한, 상태 객체의 깊은 중첩(nested object)을 피하고 가능한 한 '얕은(flat)' 구조를 유지하는 것이 좋습니다. 깊은 중첩은 상태 업데이트 로직을 복잡하게 만들고 불변성을 유지하기 어렵게 하여 잠재적인 버그 발생 가능성을 높일 수 있기 때문입니다.
+- **5. 리액트의 자동 동기화 메커니즘 활용**: 자바스크립트에서는 `applyFilter()`나 `render()`와 같은 함수를 직접 호출하여 상태 변경 후 UI를 수동으로 동기화해야 하는 책임이 개발자에게 있습니다. 하지만 리액트에서는 `setState`만 호출하면, 리액트가 자동으로 컴포넌트를 다시 렌더링하여 UI를 최신 상태와 일치시킵니다. 이 `자동 동기화`는 개발자가 UI 업데이트 로직에서 해방되어 핵심 비즈니스 로직에 집중할 수 있게 하며, 휴먼 에러를 줄여 코드의 안정성을 높이는 데 크게 기여합니다.
+
+## 자바스크립트 vs 리액트 차이
+
+이제 둘 사이의 차이를 살펴보겠습니다.
+
+| 구분            | 자바스크립트                                    | 리액트                                         |
+| --------------- | ----------------------------------------------- | ---------------------------------------------- |
+| 상태 정의       | `searchTerm`, `inStockOnly`, `filteredProducts` | `searchTerm`, `inStockOnly` (결과는 파생 계산) |
+| 상태 변경       | 값 직접 갱신 후 필터 함수 수동 호출             | `setState`로 값 변경 → 렌더링 중 필터 계산     |
+| UI 업데이트     | DOM API 호출로 수동 동기화                      | 상태 변경 시 자동 리렌더링                     |
+| 중복/모순 위험  | 결과 상태 별도 보관으로 누락 가능               | SSOT로 모순 최소화                             |
+| 구조적 권장사항 | 객체로 뭉치다 깊은 중첩으로 흐르기 쉬움         | 독립 값 분리, 얕은(Flat) 구조 권장             |
+
+## 요약
+
+이번 편에서는 리액트에서 상태 구조를 어떻게 설계하면 중복을 줄이고 예측 가능한 데이터를 유지할 수 있는지, 최소 상태·SSOT·파생 상태 계산·독립 값 분리 같은 원칙을 예제와 함께 살펴보았습니다. 공부한 것을 정리해보면 다음과 같습니다.
+
+- **최소 상태**: 화면에 꼭 필요한 사실만 저장하고 나머지는 계산합니다.
+- **SSOT**: 동일 정보를 중복 저장하지 않아 모순을 줄입니다.
+- **파생 상태 계산**: 필터·합계·길이 등은 렌더링 중 계산합니다.
+- **독립 값 분리**: 서로 영향이 약한 값은 같은 객체로 묶지 말고 분리하여 평평한 구조를 유지합니다.
+- **자동 동기화**: 리액트는 상태 변경 시 자동 리렌더링으로 UI를 일치시킵니다(자바스크립트는 수동 동기화).
+- **중복 상태의 비용**: 결과를 별도 상태로 들고 있으면 동기화 책임과 버그 위험이 커집니다.
+
+이 원칙들은 다음 편의 주제인 상태 공유(상태 끌어올리기)와도 연결됩니다. 구조가 단순할수록 상태를 어디로 옮길지, 어떤 컴포넌트가 소유해야 하는지 판단이 훨씬 수월해진다는 생각이 듭니다. 다음으로는 리액트만의 특별한 상태 공유 패턴을 알아보겠습니다.
+
+## 참고문서
+
+– [[State 구조 선택하기 (Choosing the State Structure)](https://ko.react.dev/learn/choosing-the-state-structure)]
