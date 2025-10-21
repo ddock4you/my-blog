@@ -88,7 +88,7 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
             seriesName={seriesMeta.title}
           />
         )}
-        <div className="prose prose-sm md:prose-base dark:prose-invert">
+        <div className="prose md:prose-lg dark:prose-invert prose-inline-code">
           <PostContent content={post.content} />
         </div>
         <Giscus />

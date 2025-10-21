@@ -1,0 +1,284 @@
+---
+title: '함수에서 컴포넌트로 - 리액트의 기본 단위 이해하기'
+publishedAt: '2025-08-03'
+summary: '함수에서 컴포넌트로: JSX·재사용·선언형 UI의 시작'
+category: '개발'
+series: 'reactDocs'
+image: '/react-logo.png'
+---
+
+## 들어가며
+
+안녕하세요. 지난 1-1편과 1-2편에선 자바스크립트와 리액트의 첫 만남을 가지고, 리액트 개발 환경을 구성해 보았습니다. 이제 리액트 개발의 핵심이자 기본 단위인 '컴포넌트'에 대해 탐구해 볼 시간입니다.
+
+우리가 자바스크립트로 개발할 때는 필요한 기능을 함수로 만들고, 이 함수들을 조합하여 웹 페이지를 구성했습니다. 리액트에서도 마찬가지로 '함수'라는 개념이 중요하게 사용되지만, 이 함수가 특별한 형태로 진화하여 '컴포넌트'라는 새로운 의미를 가지게 됩니다.
+
+이번 편에서는 자바스크립트에서 UI 요소를 함수로 만들던 방식과 리액트에서 컴포넌트로 만드는 방식을 비교하며, 리액트 컴포넌트가 가지는 특별한 의미와 장점을 알아보겠습니다. 리액트가 어떻게 UI를 구성하는 새로운 패러다임을 제시하는지 함께 살펴보겠습니다.
+
+## 자바스크립트로 UI 요소 만들기
+
+먼저 우리가 늘 사용해온 방식으로, 자바스크립트를 사용해 간단한 UI 요소인 버튼을 생성하는 함수를 만들어 보겠습니다. 이 함수는 버튼의 텍스트와 클릭 이벤트를 인자로 받아 HTML에 추가하는 역할을 합니다. 이를 통해 우리는 HTML 문서 구조를 기반으로 자바스크립트가 DOM을 어떻게 조작하는지 다시 한번 확인할 수 있습니다.
+
+```html
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>자바스크립트 UI 버튼</title>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script>
+      (() => {
+        // 자바스크립트로 버튼 UI 요소를 생성하는 함수
+        function createButton(text, onClick) {
+          const button = document.createElement("button");
+          button.className = "my-button"; // 스타일을 위한 클래스
+          button.textContent = text;
+          button.addEventListener("click", onClick);
+          return button;
+        }
+
+        // root 요소에 버튼 추가
+        const root = document.getElementById("root");
+        if (root) {
+          const myButton = createButton("클릭하세요", () => {
+            alert("버튼이 클릭되었습니다!");
+          });
+          root.appendChild(myButton);
+        }
+      })();
+    </script>
+  </body>
+</html>
+```
+
+위 코드는 `createButton`이라는 함수를 정의하고, 이 함수를 이용해 '클릭하세요' 텍스트를 가진 버튼을 생성한 후 `root`라는 `div` 요소에 추가하는 과정을 보여줍니다. 함수는 버튼 요소를 만들고, 텍스트를 설정하며, 이벤트 리스너를 붙여 반환합니다. 이는 자바스크립트에서 UI를 구성하는 전형적인 명령형 방식입니다.
+
+## 리액트로 동일한 UI 요소 만들기
+
+이제 리액트 버전으로 넘어가 보겠습니다. 리액트에서는 UI 요소를 만들 때 더 이상 DOM API를 직접 조작하지 않습니다. 대신, '컴포넌트'라는 특별한 함수를 사용하여 우리가 원하는 UI의 모습을 "선언"합니다. 리액트는 우리가 선언한 대로 UI를 알아서 그려줍니다.
+
+리액트 프로젝트에서는 JSX(JavaScript XML)라는 문법을 사용합니다. JSX는 자바스크립트 안에서 HTML과 유사한 마크업을 작성할 수 있게 해주는 문법 확장입니다. 이는 빌드 과정에서 `React.createElement` 호출로 변환되므로, 본질적으로는 동일하게 작동하지만 훨씬 가독성이 좋습니다. JSX에 대한 자세한 설명은 다음편에서 소개하겠습니다.
+
+여기서 중요한 점은 리액트 컴포넌트를 만들 때 지켜야 할 몇 가지 규칙입니다. 첫째, **컴포넌트 파일명은 항상 첫 글자를 대문자로 시작**해야 합니다(예: `MyComponent.jsx`). 둘째, **컴포넌트 함수의 이름 또한 첫 글자를 대문자로 시작**해야 합니다(예: `function MyComponent() { ... }`). 이러한 규칙은 리액트가 일반 자바스크립트 함수와 컴포넌트 함수를 구분하고, 개발자가 코드를 더 쉽게 이해하고 관리할 수 있도록 돕습니다.
+
+### 파일 구조
+
+```text
+src/
+├── components/
+│   └── MyButton.jsx
+├── App.jsx
+└── main.jsx
+```
+
+### `src/components/MyButton.jsx` (재사용 가능한 버튼 컴포넌트)
+
+```jsx
+export default function MyButton({ text, onClick }) {
+  return (
+    <button className="my-button" onClick={onClick}>
+      {text}
+    </button>
+  );
+}
+```
+
+### `src/App.jsx` (최상위 앱 컴포넌트)
+
+```jsx
+import MyButton from './components/MyButton';
+
+export default function App() {
+  return (
+    <div className="button-container">
+      {/* 스타일을 위한 클래스 */}
+      <MyButton text="React 버튼 1" onClick={() => alert('React 버튼 1 클릭!')} />
+      <MyButton text="React 버튼 2" onClick={() => alert('React 버튼 2 클릭!')} />
+      <MyButton text="React 버튼 3" onClick={() => alert('React 버튼 3 클릭!')} />
+    </div>
+  );
+}
+```
+
+### `src/main.jsx` (애플리케이션 진입점 파일)
+
+```jsx
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import React from 'react';
+
+const rootElement = document.getElementById('root');
+if (rootElement) {
+  ReactDOM.createRoot(rootElement).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+}
+```
+
+위 리액트 코드는 자바스크립트 예제와 동일한 UI를 렌더링합니다. 주목할 점은 `MyButton` 컴포넌트가 `text`와 `onClick`이라는 `prop`을 받아 `button` 요소를 반환하고, `App` 컴포넌트에서 이 `MyButton` 컴포넌트를 사용하여 `UI`를 구성한다는 것입니다. `main.jsx` 파일은 애플리케이션의 진입점으로, `App` 컴포넌트를 `root` 요소에 렌더링하는 역할을 합니다.
+
+## 명령형 vs 선언형 차이
+
+앞서 자바스크립트로 UI 요소를 만들고 리액트 컴포넌트로 동일한 UI를 만드는 과정을 살펴보면서, 여러분은 두 가지 방식의 근본적인 차이를 경험하셨을 것입니다. 이는 1-1편에서도 이미 보셨듯이, **명령형(Imperative) 프로그래밍**과 **선언형(Declarative) 프로그래밍**이라는 UI를 다루는 방식의 중요한 차이에서 비롯됩니다. 간략하게 다시 살펴보겠습니다.
+
+- **명령형 프로그래밍**: "어떻게(How)" 할지에 집중하며, 개발자가 모든 과정을 직접 지시합니다. 자바스크립트의 DOM 조작이 대표적인 예입니다.
+- **선언형 프로그래밍**: "무엇(What)"을 원하는지에 집중하며, 결과만을 선언하고 시스템이 알아서 처리하게 합니다. 리액트 컴포넌트가 선언형 프로그래밍의 핵심입니다.
+
+## 컴포넌트의 재사용성
+
+리액트의 가장 강력한 특징 중 하나는 바로 **컴포넌트의 강력한 재사용성**입니다. 자바스크립트에서도 함수를 만들어 재사용할 수 있었지만, 리액트의 컴포넌트는 UI 조각과 그 로직을 완벽하게 캡슐화하여 마치 독립적인 빌딩 블록처럼 사용할 수 있게 해줍니다.
+
+### 자바스크립트에서의 재사용
+
+자바스크립트에서 UI 요소를 재사용하는 가장 기본적인 방법은 '함수'를 활용하는 것입니다. 앞서 `자바스크립트로 UI 요소 만들기` 섹션에서 보았듯이, `createButton`과 같은 함수를 정의하면 동일한 로직을 여러 번 호출하여 재사용할 수 있습니다.
+
+아래 예시는 `createButton` 함수를 사용하여 여러 개의 버튼을 만들어 웹 페이지에 추가하는 과정을 보여줍니다. 이 방식은 각 버튼이 독립적인 요소로 존재하며, 필요한 경우 개별적으로 DOM에 추가되고 관리될 수 있음을 보여줍니다.
+
+```html
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>자바스크립트 재사용 버튼</title>
+  </head>
+  <body>
+    <h1>자바스크립트 재사용 예시</h1>
+    <div id="app"></div>
+
+    <script>
+      (() => {
+        // 재사용 가능한 버튼 생성 함수 (UI 요소 만들기 섹션과 동일)
+        function createButton(text, onClick) {
+          const button = document.createElement("button");
+          button.className = "my-button"; // 스타일을 위한 클래스
+          button.textContent = text;
+          button.addEventListener("click", onClick);
+          return button;
+        }
+
+        const appDiv = document.getElementById("app");
+        if (appDiv) {
+          // 여러 개의 버튼 생성 및 추가
+          const button1 = createButton("버튼 1", () => alert("첫 번째 버튼 클릭!"));
+          const button2 = createButton("버튼 2", () => alert("두 번째 버튼 클릭!"));
+          const button3 = createButton("버튼 3", () => alert("세 번째 버튼 클릭!"));
+
+          const buttonContainer = document.createElement("div");
+          buttonContainer.className = "button-container"; // 스타일을 위한 클래스
+          buttonContainer.appendChild(button1);
+          buttonContainer.appendChild(button2);
+          buttonContainer.appendChild(button3);
+
+          appDiv.appendChild(buttonContainer);
+        }
+      })();
+    </script>
+  </body>
+</html>
+```
+
+위 예시에서 `createButton` 함수는 버튼을 생성하는 로직을 재사용할 수 있게 해줍니다. 하지만 각 버튼을 생성하고 DOM에 추가하는 과정은 여전히 수동적이며, 버튼의 속성(텍스트, 클릭 핸들러)을 직접 전달해야 합니다. 만약 버튼의 종류가 많아지거나, 각 버튼이 고유한 내부 상태를 가져야 한다면 이 방식은 빠르게 복잡해질 수 있습니다. 이러한 한계점은 리액트의 컴포넌트 기반 접근 방식이 얼마나 효율적인지를 이해하는 중요한 배경이 됩니다.
+
+### 리액트에서의 재사용
+
+리액트에서는 `MyButton` 컴포넌트가 `text`와 `onClick`이라는 속성(Props)만 전달하면 어디서든 원하는 모습과 동작으로 재사용할 수 있습니다. 자바스크립트의 함수수 기반 접근 방식보다 훨씬 선언적이고 직관적인 방법으로 컴포넌트를 재활용할 수 있습니다.
+
+아래 예시는 `MyButton` 컴포넌트를 여러 번 재사용하여 다양한 텍스트와 클릭 동작을 가진 버튼들을 생성하는 과정을 보여줍니다. JSX를 활용하여 마치 HTML을 작성하듯이 컴포넌트를 배치하는 간결함에 주목해 주세요.
+
+### 파일 구조
+
+```text
+src/
+├── components/
+│   └── MyButton.jsx
+├── App.jsx
+└── main.jsx
+```
+
+### `src/components/MyButton.jsx` (재사용 가능한 버튼 컴포넌트)
+
+```jsx
+export default function MyButton({ text, onClick }) {
+  return (
+    <button className="my-button" onClick={onClick}>
+      {text}
+    </button>
+  );
+}
+```
+
+### `src/App.jsx` (최상위 앱 컴포넌트)
+
+```jsx
+import MyButton from './components/MyButton';
+
+export default function App() {
+  return (
+    <div className="button-container">
+      {/* 스타일을 위한 클래스 */}
+      <MyButton text="React 버튼 1" onClick={() => alert('React 버튼 1 클릭!')} />
+      <MyButton text="React 버튼 2" onClick={() => alert('React 버튼 2 클릭!')} />
+      <MyButton text="React 버튼 3" onClick={() => alert('React 버튼 3 클릭!')} />
+    </div>
+  );
+}
+```
+
+### `src/main.jsx` (애플리케이션 진입점 파일)
+
+```jsx
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import React from 'react';
+
+const rootElement = document.getElementById('root');
+if (rootElement) {
+  ReactDOM.createRoot(rootElement).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+}
+```
+
+위 리액트 예시 코드를 보면, `MyButton` 컴포넌트를 필요한 만큼 `<MyButton ... />` 형태로 JSX 내부에 선언적으로 배치하기만 하면 됩니다. 각 버튼에 고유한 `text`와 `onClick` 속성(props)을 전달함으로써, 동일한 컴포넌트이지만 각각 다른 내용과 동작을 가지도록 쉽게 커스터마이징할 수 있습니다. 리액트는 이 선언된 컴포넌트 트리를 바탕으로 실제 DOM을 효율적으로 업데이트합니다. UI가 컴포넌트들의 계층 구조로 이루어진 'UI 트리'에 대한 개념은 2-7편에서 더 자세히 다룰 예정입니다.
+
+잠시 props를 언급하게 됐는데 props에 대해선 2-3편에서 더 자세히 다루겠습니다.
+
+이처럼 컴포넌트를 재사용할 수 있다는 것은 다음과 같은 여러 장점을 가져다줍니다.
+
+- **생산성 향상**: 한 번 만들어진 컴포넌트는 여러 페이지나 다른 컴포넌트에서 반복적으로 사용될 수 있으므로, 처음부터 다시 코드를 작성할 필요가 없습니다. 이는 개발 시간을 단축하고 생산성을 크게 향상시킵니다.
+- **일관된 UI**: 동일한 컴포넌트를 사용함으로써 애플리케이션 전체에 걸쳐 일관된 사용자 경험(UX)과 UI 디자인을 유지할 수 있습니다. 예를 들어, 모든 버튼이 동일한 스타일과 기본적인 동작을 가지도록 보장할 수 있습니다.
+- **유지보수 용이**: 컴포넌트 내부의 로직이나 스타일을 변경해야 할 때, 해당 컴포넌트만 수정하면 이를 사용하는 모든 곳에 변경 사항이 자동으로 적용됩니다. 이는 코드의 유지보수를 훨씬 쉽게 만듭니다.
+- **코드의 모듈화**: 각 컴포넌트가 독립적인 기능을 담당하므로, 코드를 작은 단위로 분리하고 관리하기 용이합니다. 이는 대규모 애플리케이션 개발 시 코드 베이스의 복잡성을 낮추는 데 큰 도움이 됩니다.
+
+이러한 재사용성은 리액트의 컴포넌트 기반 아키텍처의 핵심이며, 현대 웹 애플리케이션 개발에서 가장 중요한 이점 중 하나로 손꼽힙니다.
+
+### 리액트 방식의 특징 (컴포넌트의 본질)
+
+- **1. 선언형 UI와 개발자의 사고 전환**: 리액트 컴포넌트는 UI의 최종 모습(`JSX`)을 **선언적(Declarative)**으로 묘사하는 데 집중합니다. 이는 개발자가 "무엇(What)을 보여줄지"만 선언하고, 리액트가 "어떻게(How) DOM을 조작하여 그 모습을 만들지"를 담당한다는 의미입니다. 자바스크립트에서 DOM을 직접 조작하며 모든 단계를 명령했던 방식에서 벗어나, 상태 변화에 따른 UI의 결과만을 기술함으로써 코드의 복잡성을 줄이고 예측 가능성을 높이는 리액트의 핵심 철학입니다. 이러한 접근 방식은 개발자가 UI의 복잡한 구현 세부 사항보다는 애플리케이션의 핵심 로직에 더 집중하게 합니다.
+- **2. 컴포넌트 기반의 모듈화와 캡슐화**: 리액트의 기본 단위인 **컴포넌트**는 UI 조각과 그에 필요한 로직(`State`, `Props`, 이벤트 핸들러)을 하나의 독립적인 단위로 **캡슐화**합니다. 마치 레고 블록처럼 각 컴포넌트가 자체적인 기능과 UI를 가지며, 이는 코드의 **모듈화**를 가능하게 합니다. 이러한 모듈화는 대규모 애플리케이션에서 코드 베이스의 복잡성을 효과적으로 관리하고, 특정 기능의 변경이 다른 부분에 미치는 영향을 최소화하여 유지보수성을 크게 향상시킵니다.
+- **3. 강력한 재사용성과 유연성**: 한 번 잘 만들어진 컴포넌트는 `Props`라는 유연한 인터페이스를 통해 다양한 상황에서 **재사용**될 수 있습니다. `MyButton` 예시에서 보았듯이, 동일한 `MyButton` 컴포넌트에 다른 `text`나 `onClick` 함수를 전달하여 여러 개의 버튼을 쉽게 만들 수 있습니다. 이러한 재사용성은 개발 생산성을 극대화하고, 애플리케이션 전체에 걸쳐 UI의 일관성을 유지하며, 새로운 기능을 추가하거나 기존 기능을 수정할 때 드는 노력을 현저히 줄여줍니다.
+- **4. 상태 기반 UI 업데이트와 자동 동기화**: 리액트 컴포넌트는 **상태(State)**를 관리하며, 이 상태가 변경되면 리액트가 자동으로 해당 컴포넌트를 다시 렌더링하여 UI를 최신 상태로 **자동 동기화**합니다. 자바스크립트에서 개발자가 직접 `DOM` API를 호출하여 UI를 수동으로 업데이트하고 상태와의 일치를 보장해야 했던 것과 달리, 리액트는 이러한 동기화 책임을 `Virtual DOM`을 통해 효율적으로 관리합니다. 이는 개발자의 인지 부하를 줄이고, UI 버그 발생 가능성을 낮춰 애플리케이션의 안정성을 높입니다.
+- **5. Virtual DOM을 통한 효율적인 DOM 관리**: 리액트는 실제 `DOM`을 직접 조작하는 대신, **Virtual DOM(가상 DOM)**이라는 가벼운 자바스크립트 객체 트리를 사용합니다. 상태가 변경되어 컴포넌트가 다시 렌더링될 때, 리액트는 새로운 `Virtual DOM`과 이전 `Virtual DOM`을 비교하여(재조정 과정), 실제 `DOM`에서 변경이 필요한 최소한의 부분만을 찾아 효율적으로 업데이트합니다. 이 과정은 브라우저의 `DOM` 조작 비용을 최소화하여 애플리케이션의 **렌더링 성능을 최적화**하는 핵심 메커니즘이며, 개발자가 `DOM` 성능 최적화에 대한 깊은 지식 없이도 고성능 UI를 구축할 수 있게 돕습니다.
+
+## 요약
+
+지금까지 우리는 리액트 UI를 구성하는 핵심적인 방법인 컴포넌트에 대해 깊이 있게 살펴보았습니다. 자바스크립트의 함수가 리액트 컴포넌트로 어떻게 진화했는지, 그리고 이 컴포넌트가 명령형 프로그래밍 방식의 자바스크립트와 선언형 프로그래밍 방식의 리액트 사이에서 어떤 차이를 만들어내는지 이해했습니다. 리액트 컴포넌트는 재사용성과 모듈화를 통해 개발 생산성과 코드 유지보수성을 크게 향상시키는 중요한 역할을 합니다. 이번 편에서 다룬 컴포넌트의 주요 특징들을 종합하면 다음과 같습니다.
+
+- **컴포넌트의 본질**: UI를 독립적인 조각으로 분리하고 관리하는 리액트의 기본 단위
+- **선언형 UI 작성**: '무엇(What)'을 보여줄지에 집중하여 UI의 최종 모습 선언
+- **강력한 재사용성**: Props를 통해 다양한 상황에서 컴포넌트 재활용 가능
+- **모듈화와 캡슐화**: UI와 로직을 캡슐화하여 코드 응집도 및 유지보수성 향상
+- **상태 기반 렌더링**: 상태 변경 시 리액트가 UI 자동 업데이트 (명령형 JS와 대비)
+
+## 참고문서
+
+– [첫 번째 컴포넌트 (Your First Component)](https://ko.react.dev/learn/your-first-component)

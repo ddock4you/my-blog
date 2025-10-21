@@ -1,0 +1,213 @@
+---
+title: '데이터 전달의 혁신 - Props로 컴포넌트 소통하기'
+publishedAt: '2025-08-05'
+summary: 'Props와 children으로 데이터 전달·합성·재사용성 높이기'
+category: '개발'
+series: 'reactDocs'
+image: '/react-logo.png'
+---
+
+## 들어가며
+
+안녕하세요. 지난 시간에는 JSX 문법을 깊이 있게 다루면서, 리액트가 어떻게 HTML과 자바스크립트를 한데 엮어 UI를 선언적으로 표현하는지 살펴보았습니다. 이번 편에서는 컴포넌트 간에 데이터를 주고받는 방식, 즉 리액트의 핵심 개념 중 하나인 **Props**에 대해 이야기해보고자 합니다.
+
+기존 자바스크립트 개발에서는 함수를 호출할 때 매개변수를 통해 데이터를 전달하거나, 전역 변수를 활용하여 여러 함수가 특정 데이터에 접근하도록 만들었습니다. 하지만 리액트에서는 컴포넌트가 마치 조립식 블록처럼 서로 유기적으로 연결되어 UI를 구성하기 때문에, 이러한 컴포넌트들 사이에서 데이터를 효율적으로 전달하고 관리하는 것이 매우 중요합니다.
+
+이번 편에서는 자바스크립트에서 함수 매개변수를 통해 데이터를 전달하던 방식과 리액트의 Props를 비교하면서, Props가 제공하는 강력한 데이터 흐름 제어 방식과 재사용성에 대해 깊이 있게 탐구해 볼 예정입니다. 특히, Props를 효과적으로 사용하는 방법인 구조분해할당(Destructuring Assignment)과 특별한 Props인 `children` prop의 활용법까지 함께 다루어 보려고 합니다. 여러분들이 리액트의 컴포넌트 기반 사고방식에 한 걸음 더 다가설 수 있는 시간이 되기를 바랍니다.
+
+## 리액트 고유 기능 - Props 전달 및 children prop 활용
+
+자바스크립트엔 없는 리액트의 특별한 특징 중 하나는 바로 **Props** 시스템입니다. Props는 컴포넌트 간의 통신 채널이자, 컴포넌트가 자신을 렌더링하는 데 필요한 데이터를 받는 유일한 통로입니다.
+
+`Props`는 "속성(properties)"의 줄임말로, 부모 컴포넌트가 자식 컴포넌트에 값을 전달할 때 사용됩니다. 이 값은 문자열, 숫자, 불리언, 객체, 배열, 심지어 함수나 다른 JSX 요소까지 될 수 있습니다. Props는 변경 불가능(read-only)하다는 중요한 특징이 있습니다. 자식 컴포넌트는 전달받은 Props를 직접 수정할 수 없으며, 이는 애플리케이션의 데이터 흐름을 단방향으로 유지하여 예측 가능하고 디버깅하기 쉬운 코드를 만드는 데 크게 기여합니다.
+
+이러한 `Props`를 사용할 때 **구조분해할당(Destructuring Assignment)**을 활용하면, `Props` 객체에서 필요한 속성들을 간결하게 추출하여 코드의 가독성을 높일 수 있습니다. 또한, **`children` prop**이라는 특별한 `prop`은 컴포넌트 태그 사이에 위치한 자식 요소들을 받아 렌더링할 수 있게 해줍니다. 이는 `ProfileContainer`와 같이 다른 컴포넌트를 감싸는 레이아웃 컴포넌트를 만들 때 유용하며, 컴포넌트의 유연한 합성과 재사용성을 극대화합니다.
+
+이러한 Props 시스템은 리액트의 선언적이고 컴포넌트 기반의 개발 철학을 뒷받침하는 핵심 요소이며, 컴포넌트 간의 데이터 흐름을 명확하고 효율적으로 관리할 수 있도록 돕습니다.
+이제 이러한 리액트의 핵심적인 데이터 전달 방식을 이해한 상태에서, 우리가 오랫동안 사용해온 순수 자바스크립트 방식은 어떠했는지 다시 한번 살펴보겠습니다.
+
+## 자바스크립트로 데이터 전달하기
+
+먼저 자바스크립트에서 함수 매개변수를 이용해 데이터를 전달하고 UI를 업데이트하는 예시를 살펴보겠습니다. 이 예시는 사용자 정보를 받아 화면에 표시하는 간단한 컴포넌트 역할을 하는 함수를 구현합니다.
+
+```html
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JavaScript Data Passing Example</title>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script>
+      (function () {
+        function createUserCard(user) {
+          const card = document.createElement("div");
+          card.className = "user-card"; // CSS는 포함하지 않지만, 시맨틱 클래스명만 명시합니다.
+
+          const nameElement = document.createElement("h2");
+          nameElement.textContent = user.name;
+
+          const emailElement = document.createElement("p");
+          emailElement.textContent = `Email: ${user.email}`;
+
+          const ageElement = document.createElement("p");
+          ageElement.textContent = `Age: ${user.age}`;
+
+          card.appendChild(nameElement);
+          card.appendChild(emailElement);
+          card.appendChild(ageElement);
+
+          return card;
+        }
+
+        const root = document.getElementById("root");
+
+        const userData1 = {
+          name: "김철수",
+          email: "chulsoo.kim@example.com",
+          age: 30,
+        };
+        const userCard1 = createUserCard(userData1);
+        root.appendChild(userCard1);
+
+        const userData2 = {
+          name: "이영희",
+          email: "younghee.lee@example.com",
+          age: 25,
+        };
+        const userCard2 = createUserCard(userData2);
+        root.appendChild(userCard2);
+      })();
+    </script>
+  </body>
+</html>
+```
+
+위 자바스크립트 코드는 `createUserCard`라는 함수를 정의하고, 이 함수에 `user` 객체를 매개변수로 전달하여 사용자 정보를 담은 카드 형태의 DOM 요소를 생성하고 있습니다. 그리고 `userData1`과 `userData2`라는 두 가지 다른 데이터를 사용하여 각각의 사용자 카드를 생성하고 `#root` 요소에 추가하는 것을 볼 수 있습니다. 이러한 방식은 함수를 재사용하여 여러 UI 요소를 생성할 때 유용하게 활용될 수 있습니다.
+
+## 자바스크립트 방식의 특징
+
+1. **명령형 DOM 조작**: `document.createElement`나 `appendChild`와 같은 DOM API를 직접 사용하여 UI 요소를 생성하고 조립합니다. 이는 UI의 모든 변화 과정을 우리가 직접 지시해야 함을 의미합니다.
+2. **데이터와 UI의 독립적인 관리**: `createUserCard` 함수는 `user` 객체로부터 UI를 생성하지만, 데이터(`userData1`, `userData2`)와 화면에 표시될 UI (`userCard1`, `userCard2`)는 서로 독립적으로 관리됩니다. 데이터를 변경하더라도 UI는 자동으로 업데이트되지 않고, 개발자가 직접 `appendChild`와 같은 DOM 조작을 통해 화면을 갱신해야 합니다.
+3. **함수 매개변수를 통한 데이터 전달**: `createUserCard(user)`와 같이 함수 호출 시 매개변수를 사용하여 `user` 데이터를 함수 내부로 전달합니다. 이는 자바스크립트에서 보편적으로 사용되는 데이터 전달 방식입니다.
+4. **UI 요소의 수동적 재활용**: `createUserCard` 함수 자체는 `userData1`과 `userData2`를 전달하여 여러 사용자 카드를 만드는 데 재사용될 수 있습니다. 그러나 생성된 각 `userCard` DOM 요소는 `root.appendChild()`를 통해 수동으로 문서에 추가되어야 합니다.
+5. **스코프 관리를 위한 즉시 실행 함수(IIFE) 활용**: `(function () { ... })();`와 같은 즉시 실행 함수를 사용하여 코드 내 변수들(`userData1`, `root` 등)이 전역 스코프를 오염시키지 않도록 관리하고 있습니다. 이는 명시적인 스코프 관리가 필요함을 보여줍니다.
+
+이제 리액트 버전으로 넘어가 보겠습니다. 리액트에서는 데이터를 어떻게 컴포넌트 간에 전달하고 활용하는지 살펴보겠습니다.
+
+## 리액트로 동일한 사용자 카드 만들기
+
+리액트에서는 `Props`를 통해 컴포넌트 간에 데이터를 전달합니다. `Props`는 부모 컴포넌트에서 자식 컴포넌트로 데이터를 전달하는 데 사용되며, 자식 컴포넌트는 전달받은 `Props`를 마치 함수의 매개변수처럼 활용하여 자신만의 UI를 렌더링합니다. 다음은 위 자바스크립트 예제와 동일한 사용자 카드 기능을 리액트로 구현한 JSX 버전 코드입니다. 이제 컴포넌트들을 여러 파일로 분리하여 모듈화된 형태로 어떻게 구성하는지 살펴보겠습니다.
+
+```jsx
+// src/components/UserCard.jsx (별도 파일로 가정)
+export function UserCard({ user }) {
+  return (
+    <div className="user-card">
+      <h2>{user.name}</h2>
+      <p>Email: {user.email}</p>
+      <p>Age: {user.age}</p>
+    </div>
+  );
+}
+```
+
+```jsx
+// src/components/ProfileContainer.jsx (별도 파일로 가정)
+export function ProfileContainer({ children }) {
+  return (
+    <div className="profile-container">
+      <h1>User Profiles</h1>
+      {children}
+    </div>
+  );
+}
+```
+
+```jsx
+// src/App.jsx (별도 파일로 가정)
+import { UserCard } from './components/UserCard';
+import { ProfileContainer } from './components/ProfileContainer';
+
+export default function App() {
+  const userData1 = {
+    name: '김철수',
+    email: 'chulsoo.kim@example.com',
+    age: 30,
+  };
+
+  const userData2 = {
+    name: '이영희',
+    email: 'younghee.lee@example.com',
+    age: 25,
+  };
+
+  return (
+    <ProfileContainer>
+      <UserCard user={userData1} />
+      <UserCard user={userData2} />
+      <UserCard user={{ name: '박민수', email: 'minsu.park@example.com', age: 28 }} />
+    </ProfileContainer>
+  );
+}
+```
+
+```jsx
+// src/main.jsx (애플리케이션 진입점 파일)
+import ReactDOM from 'react-dom/client';
+import App from './App';
+
+const rootElement = document.getElementById('root');
+if (rootElement) {
+  ReactDOM.createRoot(rootElement).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+}
+```
+
+위 리액트 코드를 살펴보면 `UserCard` 컴포넌트가 `user`라는 `prop`을 객체 구조분해할당을 통해 받고 있습니다. `App` 컴포넌트에서는 `UserCard` 컴포넌트를 호출하면서 `user={userData1}`과 같이 `prop`을 전달하는 것을 볼 수 있습니다. 또한, `ProfileContainer` 컴포넌트에서는 `children`이라는 특별한 `prop`을 받아 내부에 포함된 JSX 요소를 렌더링하고 있습니다. 이처럼 리액트에서는 `prop`을 통해 데이터가 부모에서 자식으로 흐르며, 컴포넌트의 재사용성과 유연성을 높여줍니다.
+
+`UserCard` 컴포넌트에서 `function UserCard({ user })`와 같이 **구조분해할당(Destructuring Assignment)**을 사용하여 `Props` 객체에서 `user` 속성을 바로 추출했습니다. 이 방법은 코드를 간결하게 만들고, 어떤 `Props`를 사용하는지 명확하게 보여주는 좋은 관례입니다.
+
+또한, `ProfileContainer` 컴포넌트에서 사용된 **`children` prop**은 컴포넌트 태그 사이에 위치한 모든 내용을 그대로 렌더링할 수 있도록 해줍니다. 이는 `ProfileContainer`와 같이 레이아웃을 정의하거나, 다른 컴포넌트를 감싸는 역할을 하는 컴포넌트를 만들 때 매우 유용합니다. `children`을 사용하면, 부모 컴포넌트는 자식 컴포넌트가 어떤 내용을 렌더링할지 미리 알 필요 없이, 단순히 전달받은 내용을 자신의 내부에 '포함'시키기만 하면 되므로 컴포넌트의 유연성이 극대화됩니다. 이는 리액트의 **컴포넌트 합성(Composition)** 개념을 더욱 강력하게 만들어줍니다.
+
+## 리액트 방식의 특징 (Props)
+
+- **1. 단방향 데이터 흐름과 예측 가능성**: 리액트의 `Props`는 항상 **부모에서 자식 컴포넌트로만 데이터가 전달**되는 **단방향 데이터 흐름(Unidirectional Data Flow)** 원칙을 따릅니다. 자식 컴포넌트는 전달받은 `Props`를 직접 변경할 수 없는 **읽기 전용(Read-Only)** 값입니다. 이러한 엄격한 규칙은 데이터의 출처를 명확히 하고, 상태 변화의 파급 효과를 예측 가능하게 하여 복잡한 애플리케이션의 디버깅을 용이하게 하고 코드의 안정성을 크게 향상시킵니다. 즉, 데이터가 한 방향으로만 흐르므로 예상치 못한 사이드 이펙트를 줄일 수 있습니다.
+- **2. 컴포넌트 인터페이스로서의 역할**: `Props`는 컴포넌트가 외부 세계(`Parent Component`)와 소통하는 **공개 인터페이스(Public Interface)** 역할을 합니다. 컴포넌트는 자신이 어떤 `Props`를 받아 어떤 UI를 렌더링할지 명확하게 정의하며, 외부에서는 이 인터페이스를 통해 필요한 데이터를 전달합니다. 이러한 명확한 인터페이스는 컴포넌트의 **재사용성**을 극대화하고, 다양한 데이터 입력에 따라 동일한 컴포넌트 로직으로 여러 UI를 생성할 수 있게 합니다. 이는 컴포넌트 기반 아키텍처의 핵심 원리 중 하나입니다.
+- **3. `children` `prop`을 통한 유연한 컴포넌트 합성**: `children` `prop`은 컴포넌트 태그 사이에 위치한 자식 요소들(다른 `JSX` 엘리먼트, 문자열, 배열 등)을 마치 일반 `prop`처럼 받아 렌더링할 수 있게 해주는 특별한 `prop`입니다. 이는 `ProfileContainer`와 같이 다른 컴포넌트를 감싸는 레이아웃 컴포넌트를 만들거나, 재사용 가능한 컨테이너 컴포넌트를 만들 때 매우 유용합니다. `children`을 사용하면 컴포넌트의 유연한 **합성(Composition)**을 지원하여, 부모 컴포넌트가 자식 컴포넌트의 구체적인 내용을 미리 알 필요 없이 일반적인 컨테이너 역할을 수행할 수 있도록 합니다. 이는 컴포넌트의 재사용성과 확장성을 동시에 높여줍니다.
+- **4. 구조분해할당(Destructuring Assignment)을 통한 가독성 향상**: `UserCard({ user })`와 같이 컴포넌트 함수 매개변수에서 **구조분해할당(Destructuring Assignment)**을 활용하면, `Props` 객체에서 필요한 속성들을 간결하게 추출하여 코드의 가독성을 높일 수 있습니다. 이는 어떤 `Props`를 사용하는지 명확하게 보여주며, 반복적인 `props.user.name`과 같은 접근을 줄여 코드를 더욱 깔끔하게 만듭니다. 이러한 문법적 편의성은 개발자가 컴포넌트 로직에 더 집중할 수 있도록 돕습니다.
+- **5. 상태 기반 선언형 UI와 자동 동기화**: `Props` 값이 변경되면, 리액트는 해당 `Props`를 받는 컴포넌트를 자동으로 다시 렌더링하여 UI를 최신 상태로 동기화합니다. 이는 자바스크립트에서 개발자가 직접 `DOM` API를 호출하여 UI를 수동으로 변경해야 했던 것과 달리, `Props` 변경에 따른 `UI` 변화를 리액트가 **선언적(Declarative)**으로 관리한다는 의미입니다. 개발자는 데이터가 어떻게 전달되고 변경될지에만 집중하면, `UI`는 자동으로 그 데이터를 반영하므로 개발 생산성이 크게 향상됩니다.
+
+## 자바스크립트 vs 리액트 차이
+
+이제 둘 사이의 차이를 살펴보겠습니다. 자바스크립트와 리액트에서 데이터 전달 방식은 근본적인 패러다임 차이를 보여줍니다.
+
+| 구분        | 자바스크립트 (함수 매개변수)                              | 리액트 (Props)                                                  |
+| ----------- | --------------------------------------------------------- | --------------------------------------------------------------- |
+| 데이터 전달 | 함수 호출 시 매개변수로 명시적 전달                       | 컴포넌트 태그에 속성 형태로 전달                                |
+| 데이터 사용 | 함수 내부에서 매개변수를 직접 사용                        | 컴포넌트 함수 매개변수(객체)로 받아 구조분해할당하여 사용       |
+| UI 업데이트 | 개발자가 DOM API를 직접 호출하여 수동으로 UI 변경         | `Props` 변경 시 리액트가 자동으로 UI 리렌더링                   |
+| 동기화 책임 | 데이터와 UI 간의 동기화 로직을 개발자가 직접 구현해야 함  | 리액트가 데이터(`Props`)와 UI 간의 동기화를 자동으로 처리       |
+| 재사용성    | 함수 재사용을 통해 코드 재사용 가능하나, UI 관리는 수동적 | 컴포넌트를 다양한 `Props`와 함께 재사용하여 유연한 UI 구성 가능 |
+
+## 요약
+
+지금까지 우리는 컴포넌트 간 데이터 전달의 핵심적인 방법인 Props에 대해 깊이 있게 살펴보았습니다. Props는 부모 컴포넌트에서 자식 컴포넌트로 데이터를 전달하는 리액트의 강력한 메커니즘으로, 함수 매개변수와 유사하지만 단방향 데이터 흐름과 불변성이라는 중요한 특징을 가집니다. 이번 편에서 다룬 Props의 주요 특징과 구조분해할당, 그리고 `children` prop의 활용법을 종합하면 다음과 같습니다.
+
+- **Props 본질**: 부모 -> 자식 데이터 전달 속성 (읽기 전용, 단방향 흐름)
+- **주요 활용**: 컴포넌트 태그에 속성 형태로 전달, 자식 컴포넌트에서 구조분해할당 사용
+- **`children` prop**: 컴포넌트 태그 사이 내용 렌더링, 유연한 컴포넌트 합성
+- **구조분해할당**: Props 객체에서 필요한 값 간결 추출, 코드 가독성 향상
+- **재사용성 및 선언적 UI**: Props 기반으로 컴포넌트 재사용성 높이고 UI 자동 동기화
+
+다음 편(2-4편)에서는 조건부 렌더링을 통해 상태/값에 따라 다른 UI를 선언적으로 표현하는 방법을 살펴보겠습니다.
+
+## 참고문서
+
+– [[Props를 통해 데이터 전달하기 (Passing Props to a Component)](https://ko.react.dev/learn/passing-props-to-a-component)]

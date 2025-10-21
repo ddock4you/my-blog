@@ -1,6 +1,6 @@
 title: 'Vim 가이드'
 description: '기초부터 실전까지 Vim 생산성 올인원 시리즈'
-coverImage: '/react_logo.svg'
+coverImage: '/react-logo.png'
 order:
   - vim-guide
   - vim-advanced

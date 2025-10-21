@@ -8,6 +8,12 @@
 /* 다크 모드 커스텀 변형 정의 - .dark 클래스가 있는 요소 내부의 모든 요소에 적용 */
 @custom-variant dark (&:is(.dark *));
 
+@custom-variant prose-inline-code {
+  &.prose :where(:not(pre)>code):not(:where([class~="not-prose"] *)) {
+    @slot;
+  }
+}
+
 /* Tailwind CSS 테마 설정 - CSS 변수들을 정의하여 Tailwind 클래스에서 사용할 수 있게 함 */
 @theme inline {
   --font-ibm: var(--font-ibm-plex-sans-kr);

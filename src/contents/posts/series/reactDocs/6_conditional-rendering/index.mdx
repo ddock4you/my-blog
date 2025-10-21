@@ -1,0 +1,278 @@
+---
+title: '화면 분기의 우아함 - 리액트 조건부 렌더링'
+publishedAt: '2025-08-06'
+summary: '조건부 렌더링: 삼항·&& 패턴과 선언형 분기, XSS 주의'
+category: '개발'
+series: 'reactDocs'
+image: '/react-logo.png'
+---
+
+## 들어가며
+
+우리가 웹 애플리케이션을 만들다 보면 특정 조건에 따라 다른 UI를 보여줘야 할 때가 참 많습니다. 예를 들어, 사용자가 로그인했는지 여부에 따라 '로그인' 버튼을 보여줄지, 아니면 '환영합니다, [사용자 이름]' 메시지를 보여줄지 결정해야 하는 경우가 그렇죠. 1-1편에서 살펴보았듯이 자바스크립트만으로 개발해왔던 우리에게 이러한 '화면 분기'는 `if`문이나 `switch`문을 사용해서 DOM 요소를 직접 추가하거나 제거하는 방식으로 익숙했을 것입니다.
+
+하지만 리액트에서는 이러한 조건부 렌더링을 훨씬 더 선언적이고 우아하게 처리할 수 있는 방법들을 제공합니다. 우리는 이번 편에서 자바스크립트의 전통적인 조건부 UI 조작 방식과 리액트의 조건부 렌더링 방식을 비교해보면서, 어떻게 리액트가 더 직관적이고 유지보수하기 쉬운 코드를 작성하도록 돕는지 깊이 있게 탐구해보려 합니다. 특히, `if`문뿐만 아니라 삼항 연산자(`? :`), 논리 AND 연산자(`&&`) 등 JSX 내부에서 활용할 수 있는 다양한 패턴들을 살펴보면서 리액트 컴포넌트 안에서 조건에 따라 UI를 유연하게 구성하는 방법을 함께 알아볼 것입니다.
+
+먼저 우리가 늘 사용해온 방식으로 조건부 UI를 만들어보는 것으로 시작해보겠습니다. 이 방식이 리액트와 어떻게 다르고, 리액트가 어떤 이점을 제공하는지 함께 고민해보는 시간이 되었으면 합니다.
+
+### 자바스크립트로 조건부 렌더링 만들기
+
+아래 예제는 로그인 상태를 시뮬레이션하여 사용자가 로그인했을 때와 아닐 때 다른 메시지를 보여줍니다. 이 예제는 전통적인 DOM 조작 방식이 어떻게 조건부 UI를 구성하는지 잘 보여줍니다.
+
+```html
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JavaScript Conditional Rendering</title>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script>
+      (function () {
+        let isLoggedIn = false; // 로그인 상태를 나타내는 변수
+
+        function renderApp() {
+          const rootElement = document.getElementById("root");
+          rootElement.innerHTML = ""; // 기존 내용을 초기화
+          const fragment = document.createDocumentFragment(); // DocumentFragment 생성
+
+          if (isLoggedIn) {
+            // 로그인 상태일 때 환영 메시지 표시
+            const welcomeMessage = document.createElement("h1");
+            welcomeMessage.textContent = "환영합니다, 사용자님!";
+            fragment.appendChild(welcomeMessage);
+
+            const logoutButton = document.createElement("button");
+            logoutButton.textContent = "로그아웃";
+            logoutButton.addEventListener("click", () => {
+              isLoggedIn = false;
+              renderApp();
+            });
+            fragment.appendChild(logoutButton);
+          } else {
+            // 로그아웃 상태일 때 로그인 메시지 및 버튼 표시
+            const loginMessage = document.createElement("h1");
+            loginMessage.textContent = "로그인해주세요.";
+            fragment.appendChild(loginMessage);
+
+            const loginButton = document.createElement("button");
+            loginButton.textContent = "로그인";
+            loginButton.addEventListener("click", () => {
+              isLoggedIn = true;
+              renderApp();
+            });
+            fragment.appendChild(loginButton);
+          }
+          rootElement.appendChild(fragment); // 모든 요소를 한 번에 추가
+        }
+
+        // 초기 렌더링
+        renderApp();
+      })();
+    </script>
+  </body>
+</html>
+```
+
+### 템플릿 리터럴로 조건부 렌더링 만들기 (주의 필요)
+
+사실 소개해준 삼항연산자를 사용하여 UI를 그리는 부분은 바닐라 자바스크립트에서도 사용가능하긴 합니다. 바로 템플릿 리터럴을 활용하는 것입니다. 이 방식은 코드의 가독성 측면에서 매력적일 수 있지만, 앞서 언급했던대로 **보안상 심각한 취약점(XSS)을 내포하고 있어 현대 웹 개발에서는 특별한 경우를 제외하고는 권장되지 않습니다.**
+
+아래 예제는 템플릿 리터럴을 사용한 조건부 렌더링의 핵심적인 부분만을 보여줍니다. HTML 기본 구조 및 IIFE(즉시 실행 함수)와 같은 기존 자바스크립트 예시와 겹치는 부분은 간결함을 위해 주석으로 생략했습니다.
+
+```html
+<!-- HTML 기본 구조는 기존 자바스크립트 예시와 유사합니다. -->
+<div id="root-template"></div>
+
+<script>
+  (function () {
+    // 기존 자바스크립트 예시와 동일한 IIFE 구조
+    let isLoggedInTemplate = false; // 로그인 상태를 나타내는 변수
+
+    function renderAppWithTemplate() {
+      const rootElement = document.getElementById("root-template");
+
+      // 삼항 연산자를 사용하여 조건부 HTML 문자열 생성
+      const htmlContent = isLoggedInTemplate
+        ? `
+            <h1>환영합니다, 사용자님!</h1>
+            <button id="logoutButtonTemplate">로그아웃</button>
+          `
+        : `
+            <h1>로그인해주세요.</h1>
+            <button id="loginButtonTemplate">로그인</button>
+          `;
+
+      rootElement.innerHTML = htmlContent; // 경고: XSS 취약점 발생 가능 지점!
+
+      // 이벤트 리스너는 HTML 문자열 삽입 후 별도로 추가해야 합니다.
+      const loginButton = document.getElementById("loginButtonTemplate");
+      if (loginButton) {
+        loginButton.addEventListener("click", () => {
+          isLoggedInTemplate = true;
+          renderAppWithTemplate();
+        });
+      }
+
+      const logoutButton = document.getElementById("logoutButtonTemplate");
+      if (logoutButton) {
+        logoutButton.addEventListener("click", () => {
+          isLoggedInTemplate = false;
+          renderAppWithTemplate();
+        });
+      }
+    }
+
+    // 초기 렌더링
+    renderAppWithTemplate();
+  })();
+</script>
+<!-- </body> 및 </html> 태그는 기존 예시와 동일합니다. -->
+```
+
+위 코드에서 볼 수 있듯이, 템플릿 리터럴과 삼항 연산자를 조합하여 리액트의 JSX와 유사하게 조건부 UI를 구성할 수 있습니다. 하지만 핵심적인 차이점은 HTML 문자열을 `rootElement.innerHTML = htmlContent;`와 같이 `innerHTML`을 통해 삽입한다는 점입니다.
+
+#### 템플릿 리터럴 방식의 단점 (왜 권장되지 않는가?)
+
+템플릿 리터럴로 구성한 HTML 문자열을 `innerHTML`을 통해 삽입할 경우, 다음과 같은 단점들이 발생할 수 있습니다.
+
+- **1. XSS (Cross-Site Scripting) 취약점**: 가장 치명적인 문제로, 신뢰할 수 없는 사용자 입력이 포함될 경우 악성 스크립트가 실행될 수 있습니다. `document.createElement` 및 `textContent`와 달리 `innerHTML`은 스크립트를 파싱하므로, `DOMPurify` 같은 라이브러리를 통한 철저한 살균(Sanitization) 작업이 필수적입니다.
+- **2. 이벤트 핸들러 관리의 번거로움**: DOM 노드 생성 시 즉시 이벤트 리스너를 바인딩하는 것과 달리, HTML 문자열 삽입 후 요소를 찾아 별도로 리스너를 연결해야 하므로 코드 복잡성이 증가합니다.
+
+**결론적으로, 템플릿 리터럴 방식은 작성 편의성이 있지만 보안 위험(XSS)과 관리 복잡성 때문에 바닐라 자바스크립트 환경에서는 특별한 이유 없이는 권장되지 않습니다. 리액트와 같은 프레임워크는 자동 이스케이핑을 통해 이러한 위험을 내부적으로 방지해주므로 안전하게 UI를 구성할 수 있습니다.**
+
+### 자바스크립트 방식의 특징
+
+자바스크립트로 조건부 `UI`를 다루는 방식은 우리에게 익숙하지만, 몇 가지 특징들을 가지고 있습니다.
+
+- **1. 명령형 `DOM` 조작**: `if` 문 안에서 `document.createElement`, `appendChild`, `textContent` 등과 같은 `DOM` `API`를 직접 사용하여 요소를 생성하고, 추가하고, 내용을 변경합니다. 이는 개발자가 '어떻게(How)' `UI`를 변경할지 모든 단계를 명시해야 함을 의미합니다.
+- **2. 수동적인 `UI` 업데이트**: 상태(`isLoggedIn`)가 변경될 때마다 `renderApp()` 함수를 직접 호출하여 `UI` 전체를 다시 그립니다. 부분적인 변경이라 할지라도 매번 `rootElement.innerHTML = ''`를 통해 기존 내용을 초기화하고 모든 요소를 재구성하는 비효율적인 방식입니다.
+- **3. 가독성 저하**: 자바스크립트에서 조건에 따라 UI를 동적으로 생성할 때는 `document.createElement`, `appendChild`와 같은 명령형 DOM API를 직접 사용하거나 `innerHTML`에 HTML 문자열을 삽입하는 방식이 일반적입니다. 이 경우 UI의 실제 구조가 자바스크립트 로직과 뒤섞여 있어 마치 레고 블록을 조립하는 과정을 설명하는 코드처럼 보일 수 있습니다. 이는 최종적인 UI의 모습을 한눈에 파악하기 어렵게 만들고, 조건이 복잡해질수록 코드의 가독성이 떨어져 유지보수가 어려워질 수 있습니다. 반면 React의 JSX는 UI 마크업을 자바스크립트 안에서 XML/HTML과 유사한 선언적인 형태로 표현하여, UI 구조를 직관적으로 이해할 수 있도록 돕습니다.
+- **4. 수동적인 성능 최적화 노력**: `DOM` 조작의 성능 비용을 줄이기 위해 `DocumentFragment`와 같은 기술을 사용하여 `appendChild` 호출 횟수를 줄이는 등, 개발자가 직접적인 최적화 기법을 적용해야 합니다. 리액트와 같은 프레임워크가 자동으로 처리해주는 부분들을 자바스크립트에서는 수동으로 관리해야 하는 번거로움이 있습니다.
+
+### 리액트로 동일한 조건부 렌더링 만들기
+
+이제 리액트에서는 어떻게 조건부 렌더링을 구현하는지 살펴보겠습니다. 리액트는 JSX 내부에서 자바스크립트 표현식을 사용할 수 있다는 점을 활용하여 `if` 문 없이도 조건에 따라 UI를 유연하게 렌더링할 수 있는 여러 패턴을 제공합니다. 여기서는 `useState` 훅을 사용해 로그인 상태를 관리하고, 삼항 연산자와 논리 AND 연산자를 활용하여 자바스크립트 예제와 동일한 기능을 구현해보겠습니다. (`useState` Hook에 대한 자세한 내용은 3-2편에서 다룰 예정입니다.)
+
+#### 파일 구조
+
+```text
+src/
+├── components/
+│   └── ConditionalRendering.jsx
+├── App.jsx
+└── main.jsx
+```
+
+#### `src/components/ConditionalRendering.jsx` (조건부 렌더링 컴포넌트)
+
+```jsx
+import { useState } from 'react';
+
+export default function ConditionalRendering() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  const handleLoginClick = () => {
+    setIsLoggedIn(true);
+  };
+
+  const handleLogoutClick = () => {
+    setIsLoggedIn(false);
+  };
+
+  return (
+    <div>
+      {isLoggedIn ? (
+        // 로그인 상태일 때
+        <>
+          <h1>환영합니다, 사용자님!</h1>
+          <button onClick={handleLogoutClick}>로그아웃</button>
+        </>
+      ) : (
+        // 로그아웃 상태일 때
+        <>
+          <h1>로그인해주세요.</h1>
+          <button onClick={handleLoginClick}>로그인</button>
+        </>
+      )}
+
+      {/* And 연산자를 이용한한 조건부 렌더링 예시 */}
+      {isLoggedIn && <p>현재 로그인 상태입니다.</p>}
+    </div>
+  );
+}
+```
+
+#### `src/App.jsx` (최상위 앱 컴포넌트)
+
+```jsx
+import ConditionalRendering from './components/ConditionalRendering';
+
+export default function App() {
+  return (
+    <div>
+      <h1>조건부 렌더링 예제</h1>
+      <ConditionalRendering />
+    </div>
+  );
+}
+```
+
+#### `src/main.jsx` (애플리케이션 진입점 파일)
+
+```jsx
+import ReactDOM from 'react-dom/client';
+import App from './App';
+
+const rootElement = document.getElementById('root');
+if (rootElement) {
+  ReactDOM.createRoot(rootElement).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+}
+```
+
+위 리액트 코드는 `useState` 훅을 사용하여 `isLoggedIn` 상태를 관리합니다. `ConditionalRendering` 컴포넌트의 `return` 문 안의 JSX에서는 삼항 연산자(`isLoggedIn ? <>...</> : <>...</>`)를 사용하여 `isLoggedIn` 값에 따라 로그인/로그아웃 UI를 조건부로 렌더링합니다. 또한, `isLoggedIn && <p>...</p>`와 같이 논리 AND 연산자를 활용하여 `isLoggedIn`이 `true`일 때만 특정 요소를 렌더링하는 간결한 패턴도 볼 수 있습니다. `onClick` 이벤트 핸들러를 통해 상태를 변경하면, 리액트가 자동으로 변경된 상태에 따라 UI를 효율적으로 업데이트합니다.
+
+### 리액트 방식의 특징 (조건부 렌더링)
+
+리액트의 조건부 렌더링 방식은 자바스크립트의 전통적인 방식과 비교했을 때 다음과 같은 특징을 가집니다.
+
+- **1. 선언형 UI 작성과 직관적인 조건 표현**: 리액트의 조건부 렌더링은 **선언형 UI** 작성 패러다임을 따릅니다. 개발자는 `isLoggedIn` 상태가 `true`일 때 '무엇(What)'을 보여줄지, `false`일 때 '무엇(What)'을 보여줄지 `JSX` 안에서 직접 선언적으로 기술합니다. 이는 자바스크립트에서 `DOM`을 직접 조작하며 '어떻게(How)' UI를 변경할지 명령하는 방식과 대비됩니다. `JSX`는 `HTML`과 유사한 문법으로 인해 조건부 로직이 UI 마크업과 더욱 가깝게 위치하게 되어, 코드의 가독성을 크게 향상시키고 `UI`의 의도를 직관적으로 파악할 수 있게 돕습니다.
+- **2. 상태 기반 자동 UI 업데이트 및 렌더링 효율성**: `useState` 훅으로 관리되는 상태(`isLoggedIn`)가 변경되면, 리액트는 자동으로 해당 컴포넌트를 다시 렌더링하고 **Virtual DOM**을 통해 실제 `DOM`의 최소한의 변경만을 적용합니다. 이는 자바스크립트에서 상태 변경 시 `DOM` 요소를 수동으로 추가/제거하고 UI 전체를 다시 그려야 했던 비효율적인 방식과 비교됩니다. 리액트의 이러한 메커니즘은 불필요한 `DOM` 조작을 줄여 애플리케이션의 **렌더링 성능을 최적화**하고 사용자 경험을 향상시키는 핵심적인 이점을 제공합니다.
+- **3. 다양하고 유연한 조건부 렌더링 패턴**: 리액트는 `JSX` 내부에서 자바스크립트 표현식을 활용할 수 있다는 점을 바탕으로 **다양한 조건부 렌더링 패턴**을 제공합니다. `삼항 연산자(? :)`는 `if/else` 문처럼 두 가지 조건에 따라 다른 `UI`를 렌더링할 때 유용하며, `논리 AND 연산자(&&)`는 특정 조건이 `true`일 때만 요소를 렌더링하는 간결한 방법을 제공합니다. 또한, 필요에 따라서는 컴포넌트 함수 바깥이나 `JSX` 내부에서 `if` 문을 함수 호출 형태로 사용하여 복잡한 조건도 유연하게 처리할 수 있어, 개발자에게 상황에 맞는 최적의 방법을 선택할 수 있는 자유를 줍니다.
+- **4. 컴포넌트 기반 재사용성과 모듈화**: 조건부 렌더링 로직 또한 리액트 **컴포넌트 내부에 캡슐화**되어 있습니다. 이는 로그인 여부에 따른 `UI` 분기 로직을 여러 컴포넌트에서 쉽게 재사용하거나 조합할 수 있도록 하여, 애플리케이션의 **모듈화** 수준을 높입니다. 각 컴포넌트가 독립적인 책임과 `UI`를 가지므로, 코드의 유지보수가 용이해지고 대규모 프로젝트에서 개발 효율성을 크게 향상시킵니다.
+- **5. 보안 강화 (XSS 방지)와 안정적인 UI**: 리액트의 `JSX`는 내부에 삽입되는 값을 기본적으로 **이스케이프(Escaping)** 처리합니다. 이는 자바스크립트에서 템플릿 리터럴과 `innerHTML`을 사용하여 조건부 `HTML` 문자열을 삽입할 때 발생할 수 있는 **XSS(Cross-Site Scripting) 공격**과 같은 보안 취약점을 내부적으로 방지합니다. 개발자가 별도의 보안 처리에 신경 쓰지 않아도 되므로, 애플리케이션의 **보안을 강화**하고 더욱 안정적인 `UI`를 구축할 수 있도록 돕습니다.
+
+### 자바스크립트 vs 리액트 차이
+
+우리는 자바스크립트와 리액트에서 조건부 렌더링을 구현하는 두 가지 방식을 살펴보았습니다. 이 둘의 차이는 UI를 '어떻게' 만들지 하나하나 지시하는 명령형 방식과, '무엇을' 보여줄지 선언하는 선언형 방식의 근본적인 차이에서 비롯됩니다. 특히, `JSX` 내부에서 자바스크립트 표현식을 활용하여 `UI` 로직과 마크업을 통합하는 리액트의 접근 방식은 우리가 `HTML`과 자바스크립트를 분리하여 생각했던 전통적인 방식에서 벗어나, 컴포넌트 단위로 `UI`와 로직을 함께 다루는 새로운 관점을 제시해 줍니다. 또한, 자바스크립트에서 템플릿 리터럴과 `innerHTML`을 사용한 조건부 렌더링은 `XSS`(`Cross-Site Scripting`)와 같은 보안 취약점에 노출될 수 있지만, 리액트는 `JSX` 내부에서 자동 이스케이핑을 통해 이러한 위험을 내부적으로 방지해 준다는 중요한 차이가 있습니다. 마지막으로, 자바스크립트에서는 상태 변경 시 직접 `DOM`을 조작하여 `UI`를 업데이트해야 하는 반면, 리액트에서는 상태를 변경하면 리액트가 자동으로 최적화된 방식으로 `UI`를 업데이트해줍니다. 이는 개발자가 `UI` 동기화에 대한 부담을 덜고, 애플리케이션의 비즈니스 로직에 더 집중할 수 있도록 돕는다는 점에서 큰 장점이라고 생각합니다.
+
+| 구분            | 자바스크립트 (명령형)                                           | 리액트 (선언형)                                                   |
+| --------------- | --------------------------------------------------------------- | ----------------------------------------------------------------- |
+| **개발 방식**   | `DOM` 직접 조작 (`innerHTML` 사용 시 `XSS` 취약점 가능성)       | 상태 기반 렌더링, `JSX` 내부 자동 이스케이핑으로 `XSS` 방지       |
+| **UI 업데이트** | 수동으로 `DOM` 요소 추가/제거 및 재렌더링                       | 상태 변경 시 자동 최적화 업데이트                                 |
+| **로직 통합**   | `HTML` 문자열과 `JS` 로직이 혼재, 이벤트 리스너 수동 바인딩     | 컴포넌트 내 `JSX`에서 `UI`와 로직 통합, 이벤트 핸들러 선언적 처리 |
+| **코드 가독성** | 조건이 복잡해질수록 `HTML` 문자열 내에서 가독성 저하            | `JSX` 문법 내에서 직관적인 조건부 표현 가능                       |
+| **주요 패턴**   | `if/else`, `switch` 문, 템플릿 리터럴 + `innerHTML` (보안 주의) | 삼항 연산자(`? :`), 논리 `AND` 연산자(`&&`)                       |
+
+## 요약
+
+이번 편에서는 자바스크립트 개발자로서 익숙했던 조건부 `UI` 구현 방식과 리액트의 조건부 렌더링 방식을 비교하며 그 차이점을 살펴보았고, 배운 내용을 정리해 보았습니다.
+
+- **명령형 vs 선언형**: 자바스크립트는 명령형 `DOM` 조작, 리액트는 선언형 `UI` 기술
+- **UI 업데이트 방식**: 자바스크립트는 수동, 리액트는 자동 최적화
+- **주요 조건부 렌더링 패턴**: 리액트는 삼항 연산자(`? :`), 논리 `AND` 연산자(`&&`)
+- **가독성 및 유지보수**: 리액트의 `UI`/로직 통합으로 가독성 및 재사용성 향상
+- **보안**: 자바스크립트 `innerHTML` 사용 시 `XSS` 취약점, 리액트 `JSX`는 자동 이스케이핑으로 `XSS` 방지
+
+다음 편(2-5편)에서는 리스트 렌더링과 `key` prop의 역할을 통해 반복 UI를 효율적으로 구성하는 방법을 살펴보겠습니다.
+
+## 참고문서
+
+– [조건부 렌더링 (Conditional Rendering)](https://ko.react.dev/learn/conditional-rendering)

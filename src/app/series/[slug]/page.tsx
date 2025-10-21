@@ -1,8 +1,10 @@
 import { notFound } from 'next/navigation';
-import { getAllSeries, getPostsBySeriesName, type PostWithCategory } from '@/lib/post';
+import { getAllSeries, type PostWithCategory } from '@/lib/post';
 import { MainListNav } from '@/components/MainListNav';
 import Image from 'next/image';
 import SeriesPostCard from '@/components/SeriesPostCard';
+import SeriesPostList from '@/components/SeriesPostList';
+import { loadSeriesPostInitialData } from '@/server/dataLoaders';
 
 export async function generateStaticParams() {
   const seriesList = getAllSeries();
@@ -24,13 +26,25 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   };
 }
 
-export default async function SeriesDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function SeriesDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ page?: string; mode?: 'single' | 'cumulative' }>;
+}) {
   const { slug } = await params;
+  const { page, mode } = await searchParams;
   const seriesList = getAllSeries();
   const series = seriesList.find(s => s.slug === slug);
   if (!series) notFound();
 
-  const posts = getPostsBySeriesName(series.name);
+  const pageNum = Number.isFinite(Number(page)) && Number(page) > 0 ? Number(page) : 1;
+  const { items: initialItems, total } = await loadSeriesPostInitialData({
+    slug: series.slug,
+    page: Number(page),
+    mode: mode === 'single' ? 'single' : 'cumulative',
+  });
   return (
     <div className="flex w-full flex-col gap-10 px-7 pb-11">
       <script
@@ -45,7 +59,7 @@ export default async function SeriesDetailPage({ params }: { params: Promise<{ s
             startDate: series.firstPublishedAt,
             endDate: series.lastPublishedAt,
             image: series.coverImage,
-            hasPart: posts.map((p, i) => ({
+            hasPart: initialItems.map((p, i) => ({
               '@type': 'BlogPosting',
               position: i + 1,
               headline: p.metadata.title,
@@ -80,13 +94,11 @@ export default async function SeriesDetailPage({ params }: { params: Promise<{ s
         </p>
       </section>
 
-      <ul className="flex flex-col gap-9">
-        {posts.map((post: PostWithCategory, idx: number) => (
-          <li key={post.slug}>
-            <SeriesPostCard post={post} idx={idx} count={series.count} />
-          </li>
-        ))}
-      </ul>
+      <SeriesPostList
+        slug={series.slug}
+        initialPage={pageNum}
+        initialData={{ items: initialItems, total, initialPageHydrated: pageNum }}
+      />
     </div>
   );
 }

@@ -13,14 +13,16 @@ function PostCard({ post }: { post: PostWithCategory }) {
           src={post.image || ''}
           alt={`${post.metadata.title} 썸네일`}
           fill
-          className="object-cover"
+          className="bg-bg-inverse-white object-cover"
           sizes="(max-width: 640px) 640px, 160px"
           priority={true}
         />
       </p>
       <div className="text-text-primary flex flex-col gap-4 sm:justify-center sm:gap-3">
         <p className="line-clamp-1 font-bold sm:text-lg">{post.metadata.title}</p>
-        <p className="line-clamp-2 h-10 text-sm sm:h-12 sm:text-base">{post.metadata.summary}</p>
+        <p className="line-clamp-2 max-h-10 text-sm sm:max-h-12 sm:text-base">
+          {post.metadata.summary}
+        </p>
         <div className="flex items-center gap-3 text-sm sm:gap-4 sm:text-base">
           <div className="flex items-center">
             <Calendar className="text-border-primary mr-2 h-4.5 w-4.5" />
