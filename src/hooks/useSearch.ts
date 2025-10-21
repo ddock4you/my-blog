@@ -10,6 +10,8 @@ export interface SearchResult extends PostWithCategory {
   title: string;
   summary: string;
   publishedAt: string;
+  seriesIndex?: number;
+  seriesTitle?: string;
 }
 
 export function useSearch() {
@@ -86,7 +88,8 @@ export function useSearch() {
           categoryName: searchPost.categoryName,
           fullPath: `${searchPost.category}/${searchPost.slug}`,
           image: searchPost.image,
-          readingTime: 0, // 검색 결과에서는 읽기 시간이 필요하지 않음
+          readingTime: searchPost.readingTime,
+          series: searchPost.series,
         };
 
         results.push({
@@ -96,12 +99,41 @@ export function useSearch() {
           title: searchPost.title,
           summary: searchPost.summary,
           publishedAt: searchPost.publishedAt,
+          seriesIndex: searchPost.seriesIndex,
+          seriesTitle: searchPost.seriesTitle,
         });
       }
     });
 
-    // 매치 점수 순으로 정렬
-    const sortedResults = results.sort((a, b) => b.matchScore - a.matchScore);
+    // 같은 시리즈라면 seriesIndex 내림차순을 우선 적용, 그 외에는 matchScore 우선
+    const sortedResults = results.sort((a, b) => {
+      const aSeries = (a.series || '').trim().toLowerCase();
+      const bSeries = (b.series || '').trim().toLowerCase();
+
+      if (aSeries && bSeries && aSeries === bSeries) {
+        const ai = typeof a.seriesIndex === 'number' ? a.seriesIndex : Number.NEGATIVE_INFINITY;
+        const bi = typeof b.seriesIndex === 'number' ? b.seriesIndex : Number.NEGATIVE_INFINITY;
+        if (ai !== bi) return bi - ai; // 동일 시리즈 내에서는 최신(큰 번호) 우선
+
+        const scoreTieInSeries = b.matchScore - a.matchScore;
+        if (scoreTieInSeries !== 0) return scoreTieInSeries;
+
+        // 동일 시리즈 완전 동률이면 발행일 최신순으로
+        const ad = new Date(a.publishedAt).getTime();
+        const bd = new Date(b.publishedAt).getTime();
+        if (ad !== bd) return bd - ad;
+        return a.slug.localeCompare(b.slug);
+      }
+
+      const scoreDiff = b.matchScore - a.matchScore;
+      if (scoreDiff !== 0) return scoreDiff;
+
+      // 시리즈가 다르면 발행일 최신순으로 보조 정렬
+      const ad = new Date(a.publishedAt).getTime();
+      const bd = new Date(b.publishedAt).getTime();
+      if (ad !== bd) return bd - ad;
+      return a.slug.localeCompare(b.slug);
+    });
 
     setIsLoading(false);
     return sortedResults;

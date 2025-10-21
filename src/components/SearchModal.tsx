@@ -1,12 +1,11 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import Link from 'next/link';
-import { Search, X, Calendar, BookOpen, Loader2 } from 'lucide-react';
+import { Search, X, Loader2 } from 'lucide-react';
 import { SearchResult, useSearch } from '@/hooks/useSearch';
-import { formatDate } from '@/lib/utils';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
+import SearchedPost from './SearchedPost';
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -32,7 +31,6 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
     isLoading,
     hasQuery,
     resultCount,
-    highlightMatch,
     postsLoaded,
   } = useSearch();
 
@@ -92,7 +90,7 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
         />
 
         {/* 검색 바디 */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="mb-4 flex-1 overflow-y-auto">
           {/* 포스트 데이터 로딩 중 */}
           {!postsLoaded && <SearchLoadingState message="포스트 데이터 로딩 중..." />}
 
@@ -110,7 +108,6 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
               searchResults={searchResults}
               resultCount={resultCount}
               searchQuery={searchQuery}
-              highlightMatch={highlightMatch}
               onClose={onClose}
             />
           )}
@@ -118,9 +115,6 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
           {/* 초기 상태 (검색어 없음) */}
           {postsLoaded && !hasQuery && !isLoading && <SearchInitialState />}
         </div>
-
-        {/* 푸터 */}
-        <SearchFooter />
       </div>
     </div>
   );
@@ -140,7 +134,7 @@ function SearchHeader({
         <Input
           ref={inputRef}
           type="text"
-          placeholder="포스트 제목으로 검색..."
+          placeholder="검색 내용을 입력해 주세요."
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
           className="w-full border-none py-3 pr-4 pl-10 text-lg text-gray-900 placeholder-gray-500
@@ -165,7 +159,7 @@ function SearchHeader({
 function SearchLoadingState({ message }: { message: string }) {
   return (
     <div className="flex items-center justify-center py-8">
-      <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+      <Loader2 className="h-6 w-6 animate-spin text-gray-500 dark:text-gray-300" />
       <span className="ml-2 text-gray-600 dark:text-gray-300">{message}</span>
     </div>
   );
@@ -195,13 +189,6 @@ function SearchEmptyState({ searchQuery }: { searchQuery: string }) {
 function SearchInitialState() {
   return (
     <div className="flex flex-col items-center justify-center px-4 py-12">
-      <div
-        className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-100
-          dark:bg-blue-900"
-      >
-        <Search className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-      </div>
-      <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-white">포스트 검색</h3>
       <p className="text-center text-gray-500 dark:text-gray-400">
         검색어를 입력하여 블로그 포스트를 찾아보세요.
         <br />
@@ -215,29 +202,26 @@ function SearchResults({
   searchResults,
   resultCount,
   searchQuery,
-  highlightMatch,
   onClose,
 }: {
   searchResults: SearchResult[];
   resultCount: number;
   searchQuery: string;
-  highlightMatch: (text: string, query: string) => string;
   onClose: () => void;
 }) {
   return (
-    <div className="p-4">
+    <div className="p-4 pb-0">
       <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
         {resultCount}개의 검색 결과
       </div>
 
       <div className="space-y-3">
         {searchResults.map(post => (
-          <SearchResultItem
+          <SearchedPost
             key={`${post.category}-${post.slug}`}
             post={post}
-            searchQuery={searchQuery}
-            highlightMatch={highlightMatch}
-            onClose={onClose}
+            highlightQuery={searchQuery}
+            onClick={onClose}
           />
         ))}
       </div>
@@ -245,80 +229,13 @@ function SearchResults({
   );
 }
 
-function SearchResultItem({
-  post,
-  searchQuery,
-  highlightMatch,
-  onClose,
-}: {
-  post: SearchResult;
-  searchQuery: string;
-  highlightMatch: (text: string, query: string) => string;
-  onClose: () => void;
-}) {
-  return (
-    <Link
-      href={`/posts/${post.slug}`}
-      onClick={onClose}
-      className="group block rounded-lg border border-gray-200 p-4 transition-all duration-200
-        hover:border-blue-300 hover:shadow-md dark:border-gray-700 dark:hover:border-blue-600"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          {/* 카테고리 */}
-          <div className="mb-2">
-            <span
-              className="inline-flex items-center rounded-full bg-blue-100 px-2 py-1 text-xs
-                font-medium text-blue-800 capitalize dark:bg-blue-900 dark:text-blue-200"
-            >
-              <BookOpen className="mr-1 h-3 w-3" />
-              {post.category}
-            </span>
-          </div>
-
-          {/* 제목 - 검색어 하이라이팅 */}
-          <h3
-            className="mb-2 text-base font-medium text-gray-900 transition-colors
-              group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-400"
-            dangerouslySetInnerHTML={{
-              __html: highlightMatch(post.title, searchQuery),
-            }}
-          />
-
-          {/* 요약 */}
-          <p className="mb-2 line-clamp-2 text-sm text-gray-600 dark:text-gray-300">
-            {post.summary}
-          </p>
-
-          {/* 발행일 */}
-          <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
-            <Calendar className="mr-1 h-3 w-3" />
-            <time dateTime={post.publishedAt}>{formatDate(post.publishedAt)}</time>
-          </div>
-        </div>
-      </div>
-    </Link>
-  );
-}
+// 기존 SearchResultItem 컴포넌트는 PostCard로 대체되었습니다.
 
 function SearchFooter() {
   return (
     <div
-      className="rounded-b-xl border-t border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700
+      className="border-t border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700
         dark:bg-gray-900"
-    >
-      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-        <span>
-          <kbd
-            className="rounded border border-gray-300 bg-white px-2 py-1 text-xs
-              dark:border-gray-600 dark:bg-gray-800"
-          >
-            ESC
-          </kbd>
-          로 닫기
-        </span>
-        <span>Enter로 첫 번째 결과 열기</span>
-      </div>
-    </div>
+    ></div>
   );
 }

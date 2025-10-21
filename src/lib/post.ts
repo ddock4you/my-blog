@@ -2,7 +2,13 @@ import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
 import { calculateReadingTime, slugify } from './utils';
-import { SERIES_REGISTRY, type SeriesMeta, findSeriesKey, getSeriesOrder } from './series';
+import {
+  SERIES_REGISTRY,
+  type SeriesMeta,
+  findSeriesKey,
+  getSeriesOrder,
+  getSeriesMeta,
+} from './series';
 
 // Category registry (YAML) loader
 type CategoryRegistryItem = { slug: string; name: string; order?: number };
@@ -349,22 +355,79 @@ export interface SearchData {
   title: string;
   summary: string;
   publishedAt: string;
+  readingTime: number;
   image?: string;
+  series?: string;
+  seriesIndex?: number;
+  seriesTitle?: string;
 }
 
 // 검색 데이터 생성 함수
 export function generateSearchData(): SearchData[] {
   const posts = getBlogPosts();
 
-  const searchData = posts.map(post => ({
-    slug: post.slug,
-    category: post.category,
-    categoryName: post.categoryName,
-    title: post.metadata.title,
-    summary: post.metadata.summary,
-    publishedAt: post.metadata.publishedAt,
-    image: post.image || post.metadata.image, // PostWithCategory의 image 필드 우선 사용
-  }));
+  // 시리즈별 정렬(레지스트리 order 우선, 없으면 발행일 오름차순)로 인덱스 맵 구성
+  const seriesToPosts = new Map<string, PostWithCategory[]>();
+  for (const p of posts) {
+    const name = (p.series || '').trim();
+    if (!name) continue;
+    const arr = seriesToPosts.get(name) || [];
+    arr.push(p);
+    seriesToPosts.set(name, arr);
+  }
+
+  const seriesIndexMap = new Map<string, Map<string, number>>(); // seriesName -> (slug -> index)
+  for (const [seriesName, seriesPosts] of seriesToPosts.entries()) {
+    const yamlOrder = getSeriesOrder(seriesName);
+    const orderIndex = new Map<string, number>();
+    yamlOrder.forEach((slug, idx) => orderIndex.set(slug, idx));
+
+    let ordered: PostWithCategory[];
+    if (yamlOrder.length > 0) {
+      const inYaml = yamlOrder
+        .map(slug => seriesPosts.find(p => p.slug === slug))
+        .filter((v): v is PostWithCategory => !!v);
+      const notInYaml = seriesPosts
+        .filter(p => !orderIndex.has(p.slug))
+        .sort((a, b) => {
+          const ad = new Date(a.metadata.publishedAt).getTime();
+          const bd = new Date(b.metadata.publishedAt).getTime();
+          if (ad !== bd) return ad - bd;
+          return a.slug.localeCompare(b.slug);
+        });
+      ordered = [...inYaml, ...notInYaml];
+    } else {
+      ordered = [...seriesPosts].sort((a, b) => {
+        const ad = new Date(a.metadata.publishedAt).getTime();
+        const bd = new Date(b.metadata.publishedAt).getTime();
+        if (ad !== bd) return ad - bd;
+        return a.slug.localeCompare(b.slug);
+      });
+    }
+
+    const slugToIndex = new Map<string, number>();
+    ordered.forEach((p, idx) => slugToIndex.set(p.slug, idx + 1)); // 1부터 시작
+    seriesIndexMap.set(seriesName, slugToIndex);
+  }
+
+  const searchData = posts.map(post => {
+    const seriesName = (post.series || '').trim();
+    const idx = seriesName ? seriesIndexMap.get(seriesName)?.get(post.slug) : undefined;
+    const meta = seriesName ? getSeriesMeta(seriesName) : undefined;
+    return {
+      slug: post.slug,
+      category: post.category,
+      categoryName: post.categoryName,
+      title: post.metadata.title,
+      summary: post.metadata.summary,
+      publishedAt: post.metadata.publishedAt,
+      readingTime: post.readingTime,
+      image: post.image || post.metadata.image, // PostWithCategory의 image 필드 우선 사용
+      series: post.series,
+      seriesIndex: idx,
+      seriesTitle: meta?.title || seriesName || undefined,
+    };
+  });
 
   // 발행일 기준으로 정렬 (최신순)
   return searchData.sort((a, b) => {

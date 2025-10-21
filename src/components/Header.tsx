@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect, useCallback, memo } from 'react';
-import { Sun, Moon } from 'lucide-react';
+import { Sun, Moon, Search } from 'lucide-react';
 import { SearchModal } from './SearchModal';
 import { useTheme } from '@/hooks/useTheme';
 import clsx from 'clsx';
@@ -13,9 +13,9 @@ export function Header() {
   const [lastScrollY, setLastScrollY] = useState(0);
   const { isDarkMode, toggleDarkMode } = useTheme();
 
-  // const openSearch = useCallback(() => {
-  //   setIsSearchOpen(true);
-  // }, []);
+  const openSearch = useCallback(() => {
+    setIsSearchOpen(true);
+  }, []);
 
   const closeSearch = useCallback(() => {
     setIsSearchOpen(false);
@@ -70,7 +70,7 @@ export function Header() {
         <div className="flex h-full items-center justify-between">
           <Logo />
           <Navigation
-            // openSearch={openSearch}
+            openSearch={openSearch}
             toggleDarkMode={toggleDarkMode}
             isDarkMode={isDarkMode}
           />
@@ -92,24 +92,24 @@ function Logo() {
 }
 
 const Navigation = memo(function Navigation({
-  // openSearch,
+  openSearch,
   toggleDarkMode,
   isDarkMode,
 }: {
-  // openSearch: () => void;
+  openSearch: () => void;
   toggleDarkMode: () => void;
   isDarkMode: boolean;
 }) {
   return (
     <nav className="flex items-center gap-5 text-sm">
-      {/* <button
+      <button
         onClick={openSearch}
         className="inline-flex cursor-pointer items-center gap-1"
         aria-label="검색"
       >
         <Search className="text-text-primary h-5 w-5" />
         <span className="text-text-primary text-sm font-semibold tracking-tight">검색하기</span>
-      </button> */}
+      </button>
       <button onClick={toggleDarkMode} className="cursor-pointer" aria-label="다크모드 토글">
         {!isDarkMode && <Sun className="text-text-primary h-5 w-5" />}
         {isDarkMode && <Moon className="text-text-primary h-5 w-5" />}
