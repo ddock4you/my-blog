@@ -130,8 +130,8 @@ export function useLoadMorePagination<T>(opts: UseLoadMoreOptions<T>): UseLoadMo
         }
         setPageState(targetPage);
         updateUrlPage(targetPage);
-      } catch (e: any) {
-        setError(e?.message || '로드 중 오류가 발생했습니다.');
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : '로드 중 오류가 발생했습니다.');
       } finally {
         setIsLoading(false);
         inflight.current = null;

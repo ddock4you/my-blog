@@ -1,4 +1,3 @@
-import { getAllSeries } from '@/lib/post';
 import { EmptyState } from '@/components/EmptyState';
 import { MainListNav } from '@/components/MainListNav';
 import SeriesList from '@/components/SeriesList';
@@ -15,7 +14,7 @@ interface SeriesProps {
 
 export default async function SeriesIndexPage({ searchParams }: SeriesProps) {
   const { page, mode } = await searchParams;
-  const all = getAllSeries();
+  // const all = getAllSeries();
   const { items, total, initialPage } = await loadSeriesIndexInitialData({
     page: Number(page),
     mode: mode === 'single' ? 'single' : 'cumulative',

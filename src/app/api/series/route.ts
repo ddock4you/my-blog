@@ -12,14 +12,17 @@ export async function GET(request: Request) {
     const pageSizeHeader = headerValue ? Number(headerValue) : NaN;
     const pageSize = Number.isFinite(pageSizeHeader) && pageSizeHeader > 0 ? pageSizeHeader : 10;
 
-    let series = getAllSeries();
+    const series = getAllSeries();
     const total = series.length;
     const start = (page - 1) * pageSize;
     const end = start + pageSize;
     const items = series.slice(start, end);
 
     return NextResponse.json({ items, total });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || 'Failed to load series' }, { status: 500 });
+  } catch (e: unknown) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : 'Failed to load series' },
+      { status: 500 }
+    );
   }
 }

@@ -157,7 +157,7 @@ export function getBlogPosts(): PostWithCategory[] {
     const slug = path.basename(relativePath);
     const readingTime = calculateReadingTime(content);
 
-    const category = String((metadata as any).category || '').trim();
+    const category = String((metadata as Metadata).category || '').trim();
     if (!category) {
       throw new Error(
         `MDX frontmatter에 category가 누락되었습니다: ${file}. 'category: <slug>'를 추가해주세요.`

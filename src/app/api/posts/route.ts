@@ -32,7 +32,10 @@ export async function GET(request: Request) {
     const items = posts.slice(start, end);
 
     return NextResponse.json({ items, total });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || 'Failed to load posts' }, { status: 500 });
+  } catch (e: unknown) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : 'Failed to load posts' },
+      { status: 500 }
+    );
   }
 }

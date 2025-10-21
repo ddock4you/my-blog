@@ -1,8 +1,7 @@
 import { notFound } from 'next/navigation';
-import { getAllSeries, type PostWithCategory } from '@/lib/post';
+import { getAllSeries } from '@/lib/post';
 import { MainListNav } from '@/components/MainListNav';
 import Image from 'next/image';
-import SeriesPostCard from '@/components/SeriesPostCard';
 import SeriesPostList from '@/components/SeriesPostList';
 import { loadSeriesPostInitialData } from '@/server/dataLoaders';
 import { Button } from '@/components/ui/button';

@@ -58,9 +58,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
     }
 
     return NextResponse.json({ items, total });
-  } catch (e: any) {
+  } catch (e: unknown) {
     return NextResponse.json(
-      { error: e?.message || 'Failed to load series posts' },
+      { error: e instanceof Error ? e.message : 'Failed to load series posts' },
       { status: 500 }
     );
   }
