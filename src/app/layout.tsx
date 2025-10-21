@@ -17,21 +17,31 @@ const ibmPlexSansKr = IBM_Plex_Sans_KR({
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID || '';
 
 export const metadata: Metadata = {
-  title: blogMeta.title,
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || blogMeta.canonical),
+  title: {
+    default: blogMeta.title,
+    template: '%s | BreadPan Dev Blog',
+  },
   description: blogMeta.description,
   authors: [{ name: blogMeta.author }],
   keywords: blogMeta.keywords,
   openGraph: {
     title: blogMeta.title,
     description: blogMeta.description,
+    type: 'website',
+    siteName: blogMeta.title,
+    locale: 'ko_KR',
     url: blogMeta.url,
-    images: blogMeta.image,
+    images: ['/opengraph-image'],
   },
   twitter: {
     card: 'summary_large_image',
     title: blogMeta.title,
     description: blogMeta.description,
-    images: [blogMeta.image],
+    images: ['/twitter-image'],
+  },
+  icons: {
+    icon: '/favicon.ico',
   },
 };
 

@@ -1,4 +1,6 @@
 import { getAllCategories } from '@/lib/post';
+import type { Metadata } from 'next';
+import { blogMeta } from '@/data/blogMeta';
 import { MainListNav } from '@/components/MainListNav';
 import { CategoriesList } from '@/components/CategoriesList';
 import { EmptyState } from '@/components/EmptyState';
@@ -42,3 +44,20 @@ export default async function Home({ searchParams }: HomeProps) {
     </div>
   );
 }
+
+export const metadata: Metadata = {
+  title: blogMeta.title,
+  description: blogMeta.description,
+  openGraph: {
+    title: blogMeta.title,
+    description: blogMeta.description,
+    url: blogMeta.url,
+    images: ['/opengraph-image'],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: blogMeta.title,
+    description: blogMeta.description,
+    images: ['/twitter-image'],
+  },
+};

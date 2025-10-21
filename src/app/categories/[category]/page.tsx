@@ -1,4 +1,5 @@
 import { getPostsByCategory, getAllCategories } from '@/lib/post';
+import { baseUrl } from '@/app/sitemap';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils';
@@ -26,6 +27,18 @@ export async function generateMetadata({ params }: { params: Promise<{ category:
   return {
     title: `${categoryName} 카테고리 - 포스트 목록`,
     description: `${categoryName} 카테고리의 모든 포스트들을 확인해보세요. 총 ${posts.length}개의 포스트가 있습니다.`,
+    openGraph: {
+      title: `${categoryName} 카테고리 - 포스트 목록`,
+      description: `${categoryName} 카테고리의 모든 포스트들을 확인해보세요. 총 ${posts.length}개의 포스트가 있습니다.`,
+      url: `${baseUrl}/categories/${categorySlug}`,
+      images: ['/opengraph-image'],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${categoryName} 카테고리 - 포스트 목록`,
+      description: `${categoryName} 카테고리의 모든 포스트들을 확인해보세요. 총 ${posts.length}개의 포스트가 있습니다.`,
+      images: ['/twitter-image'],
+    },
   };
 }
 

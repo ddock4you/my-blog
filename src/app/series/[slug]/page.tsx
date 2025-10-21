@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { baseUrl } from '@/app/sitemap';
 import { getAllSeries } from '@/lib/post';
 import { MainListNav } from '@/components/MainListNav';
 import Image from 'next/image';
@@ -24,6 +25,18 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return {
     title: `${title} - 시리즈`,
     description,
+    openGraph: {
+      title: `${title} - 시리즈`,
+      description,
+      url: `${baseUrl}/series/${series.slug}`,
+      images: series.coverImage ? [{ url: series.coverImage }] : ['/opengraph-image'],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${title} - 시리즈`,
+      description,
+      images: series.coverImage ? [series.coverImage] : ['/twitter-image'],
+    },
   };
 }
 
