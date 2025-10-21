@@ -46,7 +46,7 @@ export default async function SeriesDetailPage({
     mode: mode === 'single' ? 'single' : 'cumulative',
   });
   return (
-    <div className="flex w-full flex-col gap-10 px-7 pb-11">
+    <div className="flex w-full flex-col gap-10 pb-11">
       <script
         type="application/ld+json"
         suppressHydrationWarning
