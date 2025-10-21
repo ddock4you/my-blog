@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState, useEffect, useCallback, memo } from 'react';
 import { Sun, Moon } from 'lucide-react';
 import { SearchModal } from './SearchModal';
-import { useTheme } from '../hooks/useTheme';
+import { useTheme } from '@/hooks/useTheme';
 import clsx from 'clsx';
 
 export function Header() {
