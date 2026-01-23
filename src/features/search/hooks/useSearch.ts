@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSearchData } from '@/contexts/SearchContext';
+import { useSearchData } from '../contexts/SearchContext';
 import type { PostWithCategory } from '@/lib/post';
 
 export interface SearchResult extends PostWithCategory {

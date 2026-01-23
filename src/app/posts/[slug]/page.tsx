@@ -5,8 +5,8 @@ import { buildBlogPostingJsonLd, buildBreadcrumbJsonLd } from '@/lib/seo';
 import { baseUrl } from '@/app/sitemap';
 import { PostContent } from '@/components/PostContent';
 import { PostHeader } from '@/components/PostHeader';
-import { SeriesTableOfContents } from '@/components/SeriesTableOfContents';
-import SeriesPrevNextNav from '@/components/SeriesPrevNextNav';
+import { SeriesTableOfContents } from '@/features/series/components/SeriesTableOfContents';
+import SeriesPrevNextNav from '@/features/series/components/SeriesPrevNextNav';
 import { getSeriesMeta } from '@/lib/series';
 import GiscusClient from '@/components/GiscusClient';
 

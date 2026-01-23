@@ -3,36 +3,39 @@
 import { useMemo } from 'react';
 import { useLoadMorePagination } from '@/hooks/useLoadMorePagination';
 import { Button } from '@/components/ui/button';
-import SeriesPostCard from '@/components/SeriesPostCard';
+import PostCard from '@/features/posts/components/PostCard';
 import type { PostWithCategory } from '@/lib/post';
 
 type Props = {
-  slug: string;
-  initialPage: number;
+  pageSize?: number; // 훅 옵션, 기본 10
   initialData: { items: PostWithCategory[]; total: number; initialPageHydrated?: number };
+  category?: string;
 };
 
-export default function SeriesPostList({ slug, initialPage, initialData }: Props) {
+export default function PostList({ pageSize, initialData, category }: Props) {
   const fetcher = useMemo(
     () => (p: number, ps: number) =>
-      fetch(`/api/series/${slug}?page=${p}&mode=single`, {
+      fetch(`/api/posts?page=${p}&category=${category ?? ''}`, {
         headers: { 'x-page-size': String(ps) },
       }).then(r => r.json()),
-    [slug]
+    [category]
   );
 
   const { items, page, totalPages, hasMore, isLoading, loadMore } =
     useLoadMorePagination<PostWithCategory>({
       fetchPage: fetcher,
-      initialPage,
+      pageSize,
       initialData,
     });
 
   return (
-    <div className="flex flex-col gap-9">
-      {items.map((post, idx) => (
-        <SeriesPostCard key={post.slug} post={post} idx={idx} count={initialData.total} />
+    <div className="grid grid-cols-1 gap-8 pb-11">
+      {items.map(post => (
+        <PostCard key={post.slug} post={post} />
       ))}
+      {/* 단순 에러 메시지 표기 */}
+      {/* 필요한 경우 토스트로 교체 가능 */}
+      {/* 위 코멘트는 향후 토스트 도입 시 제거 */}
       {hasMore && (
         <div className="flex w-full items-center justify-center">
           <Button

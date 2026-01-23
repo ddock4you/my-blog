@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { SeriesInfo } from '@/lib/post';
 import { formatDate } from '@/lib/utils';
 import { Calendar } from 'lucide-react';
-import { Badge } from './ui/badge';
+import { Badge } from '@/components/ui/badge';
 
 function SeriesCard({ series }: { series: SeriesInfo }) {
   return (

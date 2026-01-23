@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { useLoadMorePagination } from '@/hooks/useLoadMorePagination';
 import { Button } from '@/components/ui/button';
-import SeriesCard from '@/components/SeriesCard';
+import SeriesCard from '@/features/series/components/SeriesCard';
 import type { SeriesInfo } from '@/lib/post';
 
 type Props = {

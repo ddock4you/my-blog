@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useCallback, memo } from 'react';
 import { Sun, Moon, Search } from 'lucide-react';
-import { SearchModal } from './SearchModal';
+import { SearchModal } from '@/features/search/components/SearchModal';
 import { useTheme } from '@/hooks/useTheme';
 import clsx from 'clsx';
 

@@ -3,7 +3,7 @@ import { baseUrl } from '@/app/sitemap';
 import { getAllSeries } from '@/lib/post';
 import { MainListNav } from '@/components/MainListNav';
 import Image from 'next/image';
-import SeriesPostList from '@/components/SeriesPostList';
+import SeriesPostList from '@/features/posts/components/SeriesPostList';
 import { loadSeriesPostInitialData } from '@/server/dataLoaders';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';

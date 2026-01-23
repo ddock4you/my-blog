@@ -1,6 +1,6 @@
 import { EmptyState } from '@/components/EmptyState';
 import { MainListNav } from '@/components/MainListNav';
-import SeriesList from '@/components/SeriesList';
+import SeriesList from '@/features/series/components/SeriesList';
 import { loadSeriesIndexInitialData } from '@/server/dataLoaders';
 
 export const metadata = {

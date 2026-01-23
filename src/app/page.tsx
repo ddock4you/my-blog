@@ -4,7 +4,7 @@ import { blogMeta } from '@/data/blogMeta';
 import { MainListNav } from '@/components/MainListNav';
 import { CategoriesList } from '@/components/CategoriesList';
 import { EmptyState } from '@/components/EmptyState';
-import PostList from '@/components/PostList';
+import PostList from '@/features/posts/components/PostList';
 import { loadHomeInitialData } from '@/server/dataLoaders';
 
 interface HomeProps {

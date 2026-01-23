@@ -2,10 +2,10 @@
 
 import { useEffect, useRef } from 'react';
 import { Search, X, Loader2 } from 'lucide-react';
-import { SearchResult, useSearch } from '@/hooks/useSearch';
-import { Input } from './ui/input';
-import { Button } from './ui/button';
-import SearchedPost from './SearchedPost';
+import { SearchResult, useSearch } from '@/features/search/hooks/useSearch';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import SearchedPost from '@/features/search/components/SearchedPost';
 
 interface SearchModalProps {
   isOpen: boolean;

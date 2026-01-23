@@ -4,7 +4,7 @@ import { PostWithCategory } from '@/lib/post';
 import { cn, formatDate, formatReadingTime } from '@/lib/utils';
 import { Calendar, Clock } from 'lucide-react';
 import { Fragment, ReactNode } from 'react';
-import { Badge } from './ui/badge';
+import { Badge } from '@/components/ui/badge';
 
 type SearchedPostProps = {
   post: PostWithCategory & { seriesIndex?: number; seriesTitle?: string };
