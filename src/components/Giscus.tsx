@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '@/hooks/useTheme';
 
 const repoName = process.env.NEXT_PUBLIC_GISCUS_REPO_NAME || '';
@@ -10,10 +10,31 @@ const categoryId = process.env.NEXT_PUBLIC_GISCUS_CATEGORY_ID || '';
 export default function Giscus() {
   const ref = useRef<HTMLDivElement>(null);
   const { isDarkMode } = useTheme();
+  const [shouldLoad, setShouldLoad] = useState(false);
+
   // https://github.com/giscus/giscus/tree/main/styles/themes
   const theme = isDarkMode ? 'dark' : 'light';
+
   useEffect(() => {
-    if (!ref.current || ref.current.hasChildNodes()) return;
+    if (!ref.current || shouldLoad) return;
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0]?.isIntersecting) {
+          setShouldLoad(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(ref.current);
+
+    return () => observer.disconnect();
+  }, [shouldLoad]);
+
+  useEffect(() => {
+    if (!shouldLoad || !ref.current || ref.current.hasChildNodes()) return;
 
     const scriptElem = document.createElement('script');
     scriptElem.src = 'https://giscus.app/client.js';
@@ -33,7 +54,7 @@ export default function Giscus() {
     scriptElem.setAttribute('data-lang', 'ko');
 
     ref.current.appendChild(scriptElem);
-  }, [theme]);
+  }, [shouldLoad, theme]);
 
   // https://github.com/giscus/giscus/blob/main/ADVANCED-USAGE.md#isetconfigmessage
   useEffect(() => {

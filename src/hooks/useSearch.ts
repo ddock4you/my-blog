@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchData } from '@/contexts/SearchContext';
 import type { PostWithCategory } from '@/lib/post';
 
@@ -33,9 +33,13 @@ export function useSearch() {
   }, [searchQuery]);
 
   // 검색 결과 계산
-  const searchResults = useMemo(() => {
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+
+  useEffect(() => {
     if (!debouncedQuery.trim()) {
-      return [];
+      setSearchResults([]);
+      setIsLoading(false);
+      return;
     }
 
     setIsLoading(true);
@@ -135,8 +139,8 @@ export function useSearch() {
       return a.slug.localeCompare(b.slug);
     });
 
+    setSearchResults(sortedResults);
     setIsLoading(false);
-    return sortedResults;
   }, [debouncedQuery, allPosts]);
 
   // 검색어 하이라이팅을 위한 함수

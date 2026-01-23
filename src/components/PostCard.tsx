@@ -1,4 +1,5 @@
 'use client';
+import { memo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { PostWithCategory } from '@/lib/post';
@@ -15,7 +16,6 @@ function PostCard({ post }: { post: PostWithCategory }) {
           fill
           className="bg-bg-inverse-white object-cover"
           sizes="(max-width: 640px) 640px, 160px"
-          priority={true}
         />
       </p>
       <div className="text-text-primary flex flex-col gap-4 sm:justify-center sm:gap-3">
@@ -38,4 +38,4 @@ function PostCard({ post }: { post: PostWithCategory }) {
   );
 }
 
-export default PostCard;
+export default memo(PostCard);

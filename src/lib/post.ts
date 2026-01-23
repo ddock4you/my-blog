@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
+import { cache } from 'react';
 import { calculateReadingTime, slugify } from './utils';
 // cache 제거: 원래 동작으로 복원
 import {
@@ -155,7 +156,7 @@ function readMDXFile(filePath: string) {
   return parseFrontmatter(rawContent, filePath);
 }
 
-export function getBlogPosts(): PostWithCategory[] {
+function loadBlogPosts(): PostWithCategory[] {
   const contentsDir = path.join(process.cwd(), 'src', 'contents', 'posts');
   const allFiles = getAllMDXFiles(contentsDir);
 
@@ -200,6 +201,8 @@ export function getBlogPosts(): PostWithCategory[] {
 
   return posts;
 }
+
+export const getBlogPosts = cache(loadBlogPosts);
 
 export function getPostsBySeries(category: string, series: string): PostWithCategory[] {
   const categoryPosts = getPostsByCategory(category);

@@ -14,12 +14,17 @@ interface HomeProps {
 export default async function Home({ searchParams }: HomeProps) {
   const { category, page, mode } = await searchParams;
 
-  const categories = getAllCategories();
-  const { items, total, initialPage } = await loadHomeInitialData({
+  const homeDataPromise = loadHomeInitialData({
     category,
     page: Number(page),
     mode: mode === 'single' ? 'single' : 'cumulative',
   });
+  const categoriesPromise = getAllCategories();
+
+  const [categories, { items, total, initialPage }] = await Promise.all([
+    categoriesPromise,
+    homeDataPromise,
+  ]);
 
   return (
     <div className="flex flex-col gap-8">

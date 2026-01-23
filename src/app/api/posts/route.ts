@@ -1,5 +1,18 @@
 import { NextResponse } from 'next/server';
-import { getBlogPosts } from '@/lib/post';
+import { getBlogPosts, type PostWithCategory } from '@/lib/post';
+
+const CACHE_TTL_MS = 1000 * 60; // 1분
+let cachedPosts: PostWithCategory[] | null = null;
+let cacheUpdatedAt = 0;
+
+function getCachedPosts() {
+  const now = Date.now();
+  if (!cachedPosts || now - cacheUpdatedAt > CACHE_TTL_MS) {
+    cachedPosts = getBlogPosts();
+    cacheUpdatedAt = now;
+  }
+  return cachedPosts;
+}
 
 export async function GET(request: Request) {
   try {
@@ -13,7 +26,7 @@ export async function GET(request: Request) {
     const pageSizeHeader = headerValue ? Number(headerValue) : NaN;
     const pageSize = Number.isFinite(pageSizeHeader) && pageSizeHeader > 0 ? pageSizeHeader : 10;
 
-    let posts = getBlogPosts();
+    let posts = getCachedPosts();
     // 최신순 정렬 (홈 페이지와 동일 로직)
     posts = posts.sort((a, b) => {
       if (new Date(a.metadata.publishedAt) > new Date(b.metadata.publishedAt)) {

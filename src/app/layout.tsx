@@ -1,3 +1,4 @@
+import React from 'react';
 import type { Metadata } from 'next';
 import { IBM_Plex_Sans_KR } from 'next/font/google';
 import { Header } from '@/components/Header';
@@ -5,16 +6,14 @@ import { Footer } from '@/components/Footer';
 import { SearchProvider } from '@/contexts/SearchContext';
 import { generateSearchData } from '@/lib/post';
 import './globals.css';
-import { GoogleAnalytics, GoogleTagManager } from '@next/third-parties/google';
-import { Analytics } from '@vercel/analytics/react';
 import { blogMeta } from '@/data/blogMeta';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import AnalyticsLoader from '@/components/AnalyticsLoader';
 
 const ibmPlexSansKr = IBM_Plex_Sans_KR({
   subsets: ['latin-ext'],
   weight: ['400', '600', '700'],
 });
-const GA_ID = process.env.NEXT_PUBLIC_GA_ID || '';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || blogMeta.canonical),
@@ -70,9 +69,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </div>
           </SearchProvider>
         </ThemeProvider>
-        <Analytics />
-        <GoogleAnalytics gaId={GA_ID} />
-        <GoogleTagManager gtmId={GA_ID} />
+        <AnalyticsLoader />
       </body>
     </html>
   );

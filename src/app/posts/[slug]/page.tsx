@@ -6,9 +6,9 @@ import { baseUrl } from '@/app/sitemap';
 import { PostContent } from '@/components/PostContent';
 import { PostHeader } from '@/components/PostHeader';
 import { SeriesTableOfContents } from '@/components/SeriesTableOfContents';
-import Giscus from '@/components/Giscus';
 import SeriesPrevNextNav from '@/components/SeriesPrevNextNav';
 import { getSeriesMeta } from '@/lib/series';
+import GiscusClient from '@/components/GiscusClient';
 
 export async function generateStaticParams() {
   const posts = getBlogPosts();
@@ -104,7 +104,7 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
         <div className="prose md:prose-lg dark:prose-invert prose-inline-code">
           <PostContent content={post.content} />
         </div>
-        <Giscus />
+        <GiscusClient />
         {seriesMeta && (
           <SeriesPrevNextNav
             currentPostSlug={post.slug}
