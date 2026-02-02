@@ -35,7 +35,7 @@ export function SeriesTableOfContents({
       {/* 아코디언: 현재 회차 표시 */}
       <Accordion type="single" collapsible>
         <AccordionItem value="series-contents">
-          <AccordionTrigger className="px-4">
+          <AccordionTrigger className="px-4 cursor-pointer">
             <div className="flex w-full items-center gap-3">
               {currentNumber && (
                 <span
