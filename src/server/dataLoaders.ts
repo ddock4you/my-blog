@@ -99,11 +99,11 @@ export async function loadSeriesPostInitialData({
   posts = [...posts].sort((a, b) => {
     const ai = indexMap.has(a.slug) ? indexMap.get(a.slug)! : Number.POSITIVE_INFINITY;
     const bi = indexMap.has(b.slug) ? indexMap.get(b.slug)! : Number.POSITIVE_INFINITY;
-    if (ai !== bi) return ai - bi;
+    if (ai !== bi) return bi - ai;
     const ad = new Date(a.metadata.publishedAt).getTime();
     const bd = new Date(b.metadata.publishedAt).getTime();
-    if (ad !== bd) return ad - bd;
-    return a.slug.localeCompare(b.slug);
+    if (ad !== bd) return bd - ad;
+    return b.slug.localeCompare(a.slug);
   });
 
   const total = posts.length;

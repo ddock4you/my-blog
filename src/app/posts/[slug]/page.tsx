@@ -64,7 +64,7 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
               headline: post.metadata.title,
               description: post.metadata.summary,
               datePublished: post.metadata.publishedAt,
-              authorName: 'BreadPan',
+              authorName: 'Dev Thinking',
               url: `${baseUrl}/posts/${post.slug}`,
               imageUrl:
                 post.metadata.image ||

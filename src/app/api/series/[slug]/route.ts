@@ -33,12 +33,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
       allPosts = [...allPosts].sort((a, b) => {
         const ai = indexMap.has(a.slug) ? indexMap.get(a.slug)! : Number.POSITIVE_INFINITY;
         const bi = indexMap.has(b.slug) ? indexMap.get(b.slug)! : Number.POSITIVE_INFINITY;
-        if (ai !== bi) return ai - bi;
-        // 보조 정렬: 발행일 오름차순, 그 다음 슬러그
+        if (ai !== bi) return bi - ai;
+        // 보조 정렬: 발행일 내림차순, 그 다음 슬러그 내림차순
         const ad = new Date(a.metadata.publishedAt).getTime();
         const bd = new Date(b.metadata.publishedAt).getTime();
-        if (ad !== bd) return ad - bd;
-        return a.slug.localeCompare(b.slug);
+        if (ad !== bd) return bd - ad;
+        return b.slug.localeCompare(a.slug);
       });
     } else {
       return NextResponse.json(

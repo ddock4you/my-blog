@@ -15,7 +15,7 @@ export default async function Image({
   searchParams: Promise<{ title?: string }>;
 }) {
   const { title } = await searchParams;
-  const text = (title || 'BreadPan Dev Blog').slice(0, 120);
+  const text = (title || 'Dev Thinking Dev Blog').slice(0, 120);
 
   return new ImageResponse(
     (
@@ -42,7 +42,7 @@ export default async function Image({
         >
           {text}
         </div>
-        <div style={{ marginTop: 24, fontSize: 24, opacity: 0.85 }}>@BreadPan</div>
+        <div style={{ marginTop: 24, fontSize: 24, opacity: 0.85 }}>@Dev Thinking</div>
       </div>
     ),
     { ...size }

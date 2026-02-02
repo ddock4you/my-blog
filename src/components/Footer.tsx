@@ -24,7 +24,7 @@ export function Footer() {
         </a>
         <div className="text-center">
           <p className="text-text-primary text-sm md:text-base">
-            © {year} <b>BreadPan</b> All Rights reserved.
+            © {year} <b>Dev Thinking</b> All Rights reserved.
           </p>
         </div>
       </div>

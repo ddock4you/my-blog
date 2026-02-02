@@ -27,9 +27,9 @@ export async function GET() {
   const rss = `<?xml version="1.0" encoding="UTF-8" ?>
 <rss version="2.0">
   <channel>
-    <title>BreadPan Dev Blog</title>
+    <title>Dev Thinking Dev Blog</title>
     <link>${SITE_URL}</link>
-    <description>BreadPan의 개발 블로그 RSS</description>
+    <description>Dev Thinking의 개발 블로그 RSS</description>
     ${items}
   </channel>
 </rss>`;

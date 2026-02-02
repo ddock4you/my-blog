@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || blogMeta.canonical),
   title: {
     default: blogMeta.title,
-    template: '%s | BreadPan Dev Blog',
+    template: '%s | Dev Thinking Dev Blog',
   },
   description: blogMeta.description,
   authors: [{ name: blogMeta.author }],

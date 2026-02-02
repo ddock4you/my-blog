@@ -71,7 +71,7 @@ type FormValues<T> = { [K in keyof T as `form_${string & K}`]: T[K] };
 type UserFormValues = FormValues<User>;
 ```
 
-`K in keyof T as \`form*${string & K}\`는 각 키를 `form*`접두사가 붙은 새로운 이름으로 변환합니다.`string & K`는 K가 string 타입임을 보장합니다. 이를 통해 User 인터페이스의 모든 필드가 `form_id`, `form_name` 등의 폼 필드 이름으로 변환됩니다.
+위 코드에서 `K in keyof T as` 구문은 각 키를 `form_` 접두사가 붙은 새로운 이름으로 변환합니다. `string & K`는 K가 string 타입임을 보장하는 타입 연산입니다. 이를 통해 User 인터페이스의 모든 필드가 `form_id`, `form_name` 등의 폼 필드 이름으로 변환됩니다.
 
 ### 2) 런타임 값에서 타입 추출
 

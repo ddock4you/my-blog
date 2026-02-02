@@ -45,8 +45,7 @@ export function Header() {
 function Logo() {
   return (
     <Link href="/" className="text-text-primary flex flex-col gap-2 text-right">
-      <span className="text-xl font-bold md:text-3xl">BreadPan</span>
-      <span className="text-sm font-medium">dev</span>
+      <span className="text-xl font-bold md:text-3xl">Dev Thinking</span>
     </Link>
   );
 }

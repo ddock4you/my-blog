@@ -21,7 +21,7 @@ export default async function SeriesIndexPage({ searchParams }: SeriesProps) {
   });
 
   return (
-    <div className="flex flex-col gap-8 pb-11">
+    <div className="flex flex-col gap-8 pb-11 py-4">
       <MainListNav />
       {total === 0 ? (
         <EmptyState message="아직 시리즈로 묶인 포스트가 없습니다." />
