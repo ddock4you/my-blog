@@ -1,0 +1,294 @@
+---
+title: 'Pages Router 한 편에 정리하기 – 과거 라우팅 모델과의 비교'
+publishedAt: '2025-09-25'
+summary: 'Pages Router와 App Router 대응 정리'
+category: '개발'
+series: 'nextjsDocs'
+image: '/contents/posts/series/nextjsDocs/images/11.png'
+---
+
+## 들어가며
+
+이제 "기존 Next.js 프로젝트를 App Router로 옮길 때 어떤 사고의 변화가 생기는지"를 관찰해보겠습니다.
+
+많은 프로젝트가 아직 Pages Router로 운영되고 있습니다. Next.js 13부터 App Router가 추천되지만, 마이그레이션은 쉽지 않습니다. App Router의 경계 개념을 익혀놓고 Pages Router를 다시 보면, 기존 코드가 왜 그렇게 작성되었는지와 App Router에서는 어떻게 달라지는지를 동시에 이해하게 됩니다. 결국 레거시를 유지하면서도 새 전략을 적용하는 실전적인 관점이 생깁니다.
+
+이번 편은 "기존 블로그(Pages Router) → App Router 관점으로 읽기"를 시나리오로 잡겠습니다. 같은 기능을 두 라우팅 모델로 구현하면서 파일 구조와 데이터 패칭 전략의 차이를 중심으로 비교하겠습니다. 그리고 Pages Router의 설계 의도와 App Router의 진화를 관찰하는 데 초점을 맞추겠습니다.
+
+## Pages Router 구조와 App Router 대응 원칙
+
+Pages Router와 App Router는 같은 기능을 구현하지만, 폴더 구조와 경계 설정 방식이 다릅니다. 각 라우터의 전체 구조를 먼저 파악하고, 각 경계가 어떻게 작동하는지 비교해보겠습니다.
+
+### Pages Router의 전체 구조
+
+Pages Router는 `pages/` 폴더 하나로 모든 라우팅과 기능을 관리합니다:
+
+```text
+pages/
+├── _app.js           // 전역 레이아웃과 상태 관리 (모든 페이지에 적용)
+├── _document.js      // HTML 문서 템플릿 (선택적)
+├── index.js          // 홈페이지 (/)
+├── about.js          // 소개 페이지 (/about)
+├── posts/
+│   ├── index.js      // 게시글 목록 (/posts)
+│   └── [slug].js     // 동적 게시글 상세 (/posts/[slug])
+└── api/
+    ├── posts.js      // 게시글 API 엔드포인트 (/api/posts)
+    └── users.js      // 사용자 API 엔드포인트 (/api/users)
+```
+
+**각 경계의 역할:**
+
+- **라우팅 경계**: `pages/` 폴더의 파일 구조가 곧 URL이 됩니다. `pages/posts/index.js`는 `/posts` URL로 접근 가능합니다.
+- **렌더링 경계**: 각 페이지 파일에서 `getStaticProps` 또는 `getServerSideProps` 함수수를 선택해 정적/동적 렌더링을 결정합니다.
+- **상태 공유 경계**: `_app.js`에서 모든 페이지에 공통으로 적용할 레이아웃, 전역 상태, CSS를 정의합니다.
+- **API 경계**: `pages/api/` 폴더에 API 엔드포인트를 만들면 자동으로 서버리스 함수로 작동합니다.
+
+### App Router의 전체 구조
+
+App Router는 `app/` 폴더로 계층적 구조를 만들고, 각 경로별로 세부 기능을 분리합니다:
+
+```text
+app/
+├── layout.tsx        // 루트 레이아웃 (모든 페이지에 적용)
+├── page.tsx          // 홈페이지 (/)
+├── about/
+│   └── page.tsx      // 소개 페이지 (/about)
+├── posts/
+│   ├── layout.tsx    // 게시글 전용 레이아웃 (/posts/*)
+│   ├── page.tsx      // 게시글 목록 (/posts)
+│   └── [slug]/
+│       └── page.tsx  // 동적 게시글 상세 (/posts/[slug])
+├── components/       // 재사용 컴포넌트
+└── api/
+    ├── posts/
+    │   └── route.ts  // 게시글 API 엔드포인트 (/api/posts)
+    └── users/
+        └── route.ts  // 사용자 API 엔드포인트 (/api/users)
+```
+
+**각 경계의 역할:**
+
+- **라우팅 경계**: `app/` 폴더의 중첩 구조로 계층을 만들고, 각 폴더에 `page.tsx`로 라우트를 정의합니다. `layout.tsx`로 공통 UI를 공유합니다.
+- **렌더링 경계**: 서버 컴포넌트에서 `fetch`로 데이터를 가져오고 캐시 옵션으로 정적/동적을 조절합니다. 클라이언트 컴포넌트는 `"use client"`로 분리합니다.
+- **상태 공유 경계**: 루트 `layout.tsx`에서 전역 레이아웃을 정의하고, 각 경로별 `layout.tsx`로 세부 UI를 공유합니다.
+- **API 경계**: `app/api/` 폴더에 `route.ts` 파일을 만들고 HTTP 메소드별 함수를 정의합니다.
+
+### 경계별 대응 관계
+
+| 경계 유형     | Pages Router 방식                     | App Router 방식              | 주요 차이                 |
+| :------------ | :------------------------------------ | :--------------------------- | :------------------------ |
+| **라우팅**    | `pages/` 파일 구조                    | `app/` 폴더 + `page.tsx`     | 파일 → 폴더 단위 구조화   |
+| **렌더링**    | `getStaticProps`/`getServerSideProps` | `fetch` + 캐시 옵션          | 함수 → 선언적 옵션        |
+| **상태 공유** | `_app.js` 단일 파일                   | `layout.tsx` 계층 구조       | 단일 → 중첩 레이아웃      |
+| **API**       | `pages/api/` 파일                     | `app/api/` 폴더 + `route.ts` | 파일 → 폴더 + 메소드 분리 |
+
+이 구조를 이해하면 마이그레이션 시 어떤 파일이 어디로 가야 하는지 기준이 생깁니다.
+
+## 기능 구현 및 비교
+
+블로그 같은 콘텐츠 중심 앱을 기준으로, Pages Router와 App Router의 차이를 보여드리겠습니다. 대표 시나리오는 "블로그 글 목록 + 상세 페이지 + 추천 API"로 잡겠습니다. 같은 기능을 구현하되, "파일 구조의 차이"와 "데이터 패칭 전략의 변화"를 중심으로 비교하겠습니다.
+
+### Pages Router 구성 – 파일 시스템 라우팅으로 정적·동적 처리
+
+Pages Router에서는 `pages/` 폴더 구조가 곧 라우트가 되는 파일 시스템 기반입니다. 정적 블로그 목록은 `getStaticProps`로 미리 준비하고, 동적 추천은 클라이언트에서 처리하는 구조가 됩니다.
+
+```text
+pages/
+├── index.js          // 블로그 목록 (getStaticProps)
+├── posts/
+│   └── [slug].js     // 동적 상세 페이지 (getServerSideProps)
+├── _app.js           // 전역 레이아웃
+├── _document.js      // HTML 문서 템플릿
+└── api/
+    └── recommendations.js  // 추천 API
+```
+
+블로그 목록 페이지는 정적으로 미리 준비됩니다:
+
+```jsx
+// pages/index.js
+import { BlogList } from "../components/BlogList";
+
+export default function BlogListPage({ posts }) {
+  return <BlogList posts={posts} />;
+}
+
+export async function getStaticProps() {
+  // 빌드 시점에 블로그 목록을 정적으로 준비
+  const res = await fetch("https://api.example.com/posts");
+  const posts = await res.json();
+
+  return {
+    props: { posts },
+    revalidate: 3600, // 1시간마다 재검증 (ISR)
+  };
+}
+```
+
+상세 페이지에서는 URL 파라미터를 사용해 동적으로 렌더링합니다:
+
+```jsx
+// pages/posts/[slug].js
+import { BlogPost } from "../../components/BlogPost";
+
+export default function BlogPostPage({ post }) {
+  return <BlogPost post={post} />;
+}
+
+export async function getServerSideProps({ params }) {
+  // 요청 시점에 각 글을 동적으로 준비
+  const res = await fetch(`https://api.example.com/posts/${params.slug}`);
+  const post = await res.json();
+
+  return {
+    props: { post },
+  };
+}
+
+export async function getStaticPaths() {
+  // 가능한 모든 경로를 미리 정의 (선택적)
+  const res = await fetch("https://api.example.com/posts");
+  const posts = await res.json();
+
+  const paths = posts.map((post) => ({
+    params: { slug: post.slug },
+  }));
+
+  return { paths, fallback: "blocking" };
+}
+```
+
+전역 앱 래퍼에서는 레이아웃과 상태를 공유합니다:
+
+```jsx
+// pages/_app.js
+import "../styles/globals.css";
+
+export default function MyApp({ Component, pageProps }) {
+  return (
+    <div>
+      <header>블로그 헤더</header>
+      <Component {...pageProps} />
+      <footer>블로그 푸터</footer>
+    </div>
+  );
+}
+```
+
+### App Router 구성 – 경계 설정으로 정적·동적 조각 분리
+
+App Router는 서버 컴포넌트와 클라이언트 경계로 구성합니다. 목록은 정적으로 준비하고, 추천은 동적으로 처리합니다.
+
+```text
+app/
+├── layout.tsx        // 루트 레이아웃
+├── page.tsx          // 블로그 목록 (서버 컴포넌트)
+├── posts/[slug]/
+│   └── page.tsx      // 상세 페이지 (서버 컴포넌트)
+├── components/
+│   └── RecommendationWidget.tsx // 클라이언트 위젯
+└── api/recommendations/
+    └── route.ts      // 추천 API
+```
+
+블로그 목록은 서버 컴포넌트로 준비:
+
+```tsx
+// app/page.tsx
+import { BlogList } from "./components/BlogList";
+
+async function getPosts() {
+  const res = await fetch("https://api.example.com/posts", {
+    revalidate: 3600,
+  });
+  return res.json();
+}
+
+export default async function BlogListPage() {
+  const posts = await getPosts();
+  return <BlogList posts={posts} />;
+}
+```
+
+상세 페이지는 동적 라우트로 처리:
+
+```tsx
+// app/posts/[slug]/page.tsx
+import { BlogPost } from "../../components/BlogPost";
+
+async function getPost(slug: string) {
+  const res = await fetch(`https://api.example.com/posts/${slug}`);
+  return res.json();
+}
+
+export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const post = await getPost(slug);
+  return <BlogPost post={post} />;
+}
+```
+
+### Pages Router vs App Router 비교표
+
+| 구분               | Pages Router                           | App Router                              |
+| :----------------- | :------------------------------------- | :-------------------------------------- |
+| 실행 환경 기본값   | 파일별 정적/동적 렌더링 선택           | 서버 컴포넌트로 정적, 클라이언트로 동적 |
+| 데이터 접근 모델   | getStaticProps/getServerSideProps 구분 | 서버 fetch + ISR, Route Handler         |
+| 번들 관점          | 페이지별 서버/클라이언트 분리          | 정적 콘텐츠 서버 제외, 동적 로직만 번들 |
+| 컴포넌트 분리 의미 | 파일 = 라우트 제약                     | 정적·동적 성격에 따른 렌더링 전략 분리  |
+| 설계의 제약        | 한 파일 안에서 혼합 어려움             | 경계 설정으로 정적·동적 혼합 강제       |
+
+## Next.js 라우팅 모델의 진화
+
+### Pages Router 설계 결정의 이유
+
+**쉽게 이해하기**: Pages Router는 "이 파일이 곧 웹페이지 주소가 된다"는 직관적인 규칙을 세웠습니다. 예를 들어 `pages/blog.js`를 만들면 `/blog`라는 URL이 자동으로 생기는 거죠. 이건 아주 단순하고 배우기 쉬웠어요.
+
+- **`_app.js`와 `_document.js`**: 모든 페이지에 공통으로 적용되는 "헤더, 푸터, 전역 스타일" 같은 걸 한 곳에서 관리하기 위해 만들었어요. 마치 모든 페이지에 자동으로 붙는 "템플릿" 같은 개념이죠. `_app.js`는 페이지별로 실행되는 컴포넌트 래퍼이고, `_document.js`는 HTML 문서 구조를 정의합니다.
+
+- **정적 vs 동적 구분 (`getStaticProps` / `getServerSideProps`)**: 블로그 글처럼 "자주 바뀌지 않는 콘텐츠"는 빌드할 때 미리 준비하고 (정적), 사용자별로 달라지는 대시보드는 요청할 때마다 새로 만들자 (동적)는 구분을 명확히 하기 위해 만들었어요. SEO와 성능을 동시에 잡기 위한 전략이었죠.
+
+- **API Routes (`pages/api/*`)**: "클라이언트에서 서버로 데이터 요청할 때, 같은 프로젝트 안에서 API를 만들 수 있게 하자"는 생각에서 나왔어요. `pages/api/posts.js`를 만들면 `/api/posts` 엔드포인트가 생깁니다. 프론트엔드와 백엔드를 한 곳에서 관리할 수 있는 장점이 있었죠.
+
+이 설계 덕분에 Pages Router는 "입문하기 쉽고, SSR/SSG를 쉽게 쓸 수 있는" 프레임워크가 되었지만, 한계도 있었어요. "한 페이지 파일 안에서 정적 데이터와 동적 상호작용을 섞을 수 없어서" 복잡한 UI를 만들 때 불편했죠.
+
+### App Router에서 같은 패턴을 다시 읽기
+
+Pages Router의 좋은 의도는 유지하면서, 한계를 해결한 게 App Router입니다. 같은 개념을 더 유연하게 재구성했어요.
+
+**쉽게 이해하기**: Pages Router가 "파일 = 페이지"였다면, App Router는 "컴포넌트 = 페이지 조각"으로 생각하면 됩니다. 하나의 페이지 안에 정적 부분과 동적 부분을 자유롭게 섞을 수 있게 되었죠.
+
+- **`app/layout.tsx`와 Providers**: Pages Router의 `_app.js`를 한 번 더 나눴어요. `layout.tsx`는 "UI 레이아웃"만 담당하고 (헤더, 푸터, 사이드바 같은 시각적 구조), 전역 상태(로그인 정보, 테마 설정)는 별도의 `providers` 컴포넌트로 분리합니다. 이렇게 하면 "어떤 상태가 어느 페이지까지 공유되는지"가 명확해져요.
+
+- **`fetch` + `revalidate`**: Pages Router의 `getStaticProps`/`getServerSideProps`를 더 간단하게 만들었어요. 서버 컴포넌트에서 그냥 `fetch()`를 쓰되, `revalidate: 3600` 같은 옵션으로 "얼마나 자주 새로고침할지"를 설정합니다. 정적 캐시가 필요한 부분은 `revalidate`를 넣고, 실시간 데이터가 필요한 부분은 옵션 없이 `fetch`만 쓰면 됩니다. 컴포넌트별로 캐시 전략을 세밀하게 조절할 수 있어요.
+
+- **API 경로**: `app/api/posts/route.ts`는 Pages Router의 `pages/api/posts.js`를 더 구조화했어요. 하나의 파일에서 `export async function GET() {}` `export async function POST() {}`처럼 HTTP 메소드별로 함수를 분리해서 쓰면 됩니다. API와 UI가 같은 폴더 구조 안에 있어서 "이 API는 어느 페이지에서 쓰는 건지"가 한눈에 보여요.
+
+- **중첩 경로**: `app/posts/[slug]/page.tsx`는 Pages Router의 `pages/posts/[slug].js`보다 더 풍부해요. 같은 폴더 안에 `layout.tsx`(이 카테고리 전용 레이아웃), `loading.tsx`(로딩 화면), `error.tsx`(에러 화면)를 함께 둘 수 있습니다. 하나의 블로그 글 페이지에 여러 맥락을 추가할 수 있게 되었죠.
+
+결과적으로 Pages Router 코드를 볼 때 "이 `_app.js`는 UI와 상태를 분리해야겠네", "이 `getStaticProps`는 `fetch` + `revalidate`로 바꾸면 되겠네"처럼 App Router 관점으로 자연스럽게 재해석할 수 있습니다.
+
+## 예상 질문
+
+**Q1. 기존 Pages Router 프로젝트를 App Router로 마이그레이션할 때 가장 먼저 확인해야 할 부분은?**
+
+App Router에서는 한 파일 안에서 정적/동적 로직을 섞을 수 있으므로, 기존 `getStaticProps`/`getServerSideProps`를 `fetch` 옵션으로 바꾸는 작업부터 시작하세요. `_app.js`의 전역 상태와 레이아웃은 `layout.tsx` + 별도 provider로 분리하는 것도 중요합니다.
+
+**Q2. Pages Router의 `getStaticPaths`는 App Router에서 어떻게 되나요?**
+
+동적 라우트에서 `generateStaticParams` 함수로 대체됩니다. 빌드 시점에 정적으로 생성할 경로 목록을 반환하는 방식은 유사하지만, 함수 이름과 위치가 `app/posts/[slug]/page.tsx` 안으로 이동했습니다.
+
+## 요약
+
+3-5편에서는 Pages Router의 설계 의도를 App Router 관점에서 재해석했습니다. Pages Router는 "파일 = 라우트"라는 직관으로 시작했지만, 한 파일 안에서 서버/클라이언트 로직을 섞는 게 어려웠습니다. App Router는 컴포넌트 단위 경계 설정(각 컴포넌트를 서버 실행용/클라이언트 실행용으로 명확히 분리)으로 이 한계를 해결했습니다.
+
+Pages Router의 설계 배경을 이해하면 App Router로의 마이그레이션이 수월해집니다. 기존 `_app.js`는 `layout.tsx`로, `getStaticProps`는 `fetch` 옵션으로 자연스럽게 대응됩니다. 결과적으로 경계 설정의 유연성과 데이터 패칭의 최적화가 향상됩니다.
+
+## 참조
+
+- Next.js 공식문서
+  - [Pages Router](https://nextjs.org/learn/pages-router)
+  - [App Router - Foundations](https://nextjs.org/learn/dashboard-app)
+  - [Migrating from Pages Router to App Router](https://nextjs.org/docs/app/building-your-application/upgrading/app-router-migration)
+  - [Static and Dynamic Rendering](https://nextjs.org/learn/dashboard-app/static-and-dynamic-rendering)

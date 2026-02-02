@@ -1,0 +1,255 @@
+---
+title: '스타일링 – 글로벌 CSS, CSS Modules, Tailwind 선택지'
+publishedAt: '2025-09-19'
+summary: '글로벌·모듈·Tailwind 기준 비교'
+category: '개발'
+series: 'nextjsDocs'
+image: '/contents/posts/series/nextjsDocs/images/5.png'
+---
+
+## 들어가며
+
+레이아웃으로 UI 뼈대를 세우고 내비게이션으로 그 뼈대 사이를 오갈 수 있게 된 다음 단계는 그 뼈대에 살을 붙이는 일입니다. 지난 글에서 App Router의 내비게이션이 어떻게 클라이언트 사이드 전환을 지원하면서도 서버 사이드 렌더링의 장점을 살리는지 살펴보았습니다. 이제 그 구조 안에서 스타일을 어떻게 적용할지 고민합니다.
+
+전역 CSS, CSS Modules, Tailwind가 각각 어떤 상황에 적합한지, 그리고 App Router의 폴더 구조와 어떻게 어우러지는지 확인해 보겠습니다.
+
+## 스타일링 도구 체계
+
+Next.js의 스타일링은 App Router의 파일 기반 구조, 서버/클라이언트 경계, 폴더 그룹화를 적극 활용하여 레이어별로 역할을 나눌 수 있습니다. 전역 CSS는 디자인 토큰·리셋·공통 레이아웃을 캡슐화하고, CSS Modules는 컴포넌트 개별의 스코프 스타일을 보호하며, Tailwind는 빠른 반복과 일관된 유틸리티 조합을 담당합니다. 이 세 가지를 조합하면 구조적 안정성과 스타일 재사용성, 생산성을 동시에 확보할 수 있습니다.
+
+### 전역 CSS: app/globals.css로 공통 스타일 관리
+
+가장 기본적인 방식은 app/globals.css에 공통 스타일을 모아두는 것입니다. 리셋 CSS, 디자인 토큰, 전역 컴포넌트 스타일 등을 한 곳에서 관리할 수 있습니다.
+
+```css
+/* app/globals.css */
+:root {
+  --primary-color: #3b82f6;
+  --font-family: "Inter", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-family);
+}
+
+.btn-primary {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
+}
+```
+
+이 CSS 파일은 app/layout.tsx에서 import되어 전체 애플리케이션에 적용됩니다. App Router의 루트 레이아웃이 전체 앱의 시작점이므로, 여기서 전역 스타일을 한 번 로드하면 모든 페이지와 컴포넌트에서 사용할 수 있습니다.
+
+### CSS Modules: 컴포넌트별 스코프 캡슐화
+
+컴포넌트별로 스타일을 격리해야 할 때는 CSS Modules를 사용합니다. 파일명에 .module.css를 붙이면 Next.js가 자동으로 클래스명을 해시화하여 충돌을 방지합니다.
+
+```tsx
+// components/Navigation.tsx
+import styles from "./Navigation.module.css";
+
+export function Navigation() {
+  return (
+    <nav className={styles.nav}>
+      <ul className={styles.navList}>
+        <li className={styles.navItem}>
+          <a href="/dashboard" className={styles.navLink}>
+            대시보드
+          </a>
+        </li>
+      </ul>
+    </nav>
+  );
+}
+```
+
+```css
+/* components/Navigation.module.css */
+.nav {
+  background-color: #f8f9fa;
+  padding: 1rem;
+}
+
+.navList {
+  list-style: none;
+  display: flex;
+  gap: 1rem;
+}
+
+.navItem {
+  margin: 0;
+}
+
+.navLink {
+  text-decoration: none;
+  color: #333;
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+}
+
+.navLink:hover {
+  background-color: #e9ecef;
+}
+```
+
+이 방식은 컴포넌트 파일과 스타일 파일을 같은 폴더에 둡니다. 각 컴포넌트의 스타일이 다른 컴포넌트에 영향을 미치지 않도록 합니다.
+
+### Tailwind CSS: 유틸리티 클래스 기반 스타일링
+
+빠른 프로토타이핑이나 일관된 디자인 시스템을 원할 때는 Tailwind CSS를 선택합니다. 사전 정의된 유틸리티 클래스를 조합하여 스타일을 적용합니다.
+
+```tsx
+// components/Header.tsx
+export function Header() {
+  return (
+    <header className="bg-white shadow-sm border-b border-gray-200">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-16">
+          <h1 className="text-xl font-semibold text-gray-900">대시보드</h1>
+          <nav className="flex space-x-4">
+            <a
+              href="/profile"
+              className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+            >
+              프로필
+            </a>
+          </nav>
+        </div>
+      </div>
+    </header>
+  );
+}
+```
+
+Tailwind는 별도 CSS 파일 없이 HTML 클래스 속성으로 스타일을 정의합니다. 스타일과 마크업이 한 곳에 있어 빠르게 반복 작업을 할 수 있고, 디자인 시스템이 클래스명으로 표준화됩니다.
+
+## App Router와의 심층 통합
+
+Next.js의 스타일링은 단순한 CSS 적용을 넘어 App Router의 폴더 구조, 레이아웃/페이지 계층, 서버·클라이언트 경계를 스타일 전략과 밀착시킴으로써 단일 책임과 성능을 동시에 확보합니다. 파일 기반 경계를 따라 자동으로 스타일 영역이 나뉘고, layout.tsx/route segment에 담긴 전역·공통 스타일이 해당 그룹을 아우르며, 필요할 때는 `use client`가 붙은 컴포넌트에서 상호작용 중심의 스타일을 추가합니다.
+
+### App Router 구조를 활용한 스타일 계층화
+
+라우트 그룹을 활용하면 관련 페이지들의 스타일을 논리적으로 묶어 관리할 수 있습니다. 예를 들어 대시보드 관련 페이지들은 `(dashboard)` 폴더로 그룹화하여 공통 스타일을 공유합니다.
+
+```text
+app/
+├── (auth)/
+│   ├── layout.tsx    // 인증 페이지용 스타일
+│   └── login/
+│       └── page.tsx
+└── (dashboard)/
+    ├── layout.tsx    // 대시보드용 스타일
+    ├── page.tsx
+    └── analytics/
+        └── page.tsx
+```
+
+```tsx
+// app/(dashboard)/layout.tsx
+export default function DashboardLayout({ children }) {
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <header className="bg-white border-b border-slate-200">
+        {/* 대시보드 공통 헤더 스타일 */}
+      </header>
+      <main className="flex-1 p-6">{children}</main>
+    </div>
+  );
+}
+```
+
+이 방식에선 파일 구조가 자동으로 스타일 경계를 생성하기 때문에, 대시보드 그룹의 모든 페이지가 일관된 시각적 계층을 유지하면서도 다른 그룹의 스타일과 충돌하지 않습니다.
+
+쇼핑몰을 예로 들어보겠습니다. `(customer)` 그룹에서는 밝고 친근한 색상을 사용하고, `(admin)` 그룹에서는 차분하고 전문적인 색상을 사용할 수 있습니다. 각 그룹의 layout.tsx가 그 그룹의 스타일을 적용합니다. 폴더 구조에 따라 스타일이 구분됩니다.
+
+### 서버/클라이언트 컴포넌트 경계 활용
+
+App Router에서는 컴포넌트별로 서버와 클라이언트 실행 환경을 선택할 수 있어 스타일 로딩 전략을 최적화합니다.
+
+```tsx
+// app/components/StaticContent.tsx (서버 컴포넌트)
+export function StaticContent() {
+  return (
+    <article className="prose prose-slate max-w-none">
+      {/* 최소한의 스타일만 적용 */}
+      <h1 className="text-2xl font-bold">콘텐츠 제목</h1>
+      <p className="text-slate-600">기본 텍스트 스타일</p>
+    </article>
+  );
+}
+```
+
+```tsx
+// app/components/InteractiveButton.tsx (클라이언트 컴포넌트)
+"use client";
+
+import { useState } from "react";
+
+export function InteractiveButton() {
+  const [isActive, setIsActive] = useState(false);
+
+  return (
+    <button
+      className={`px-4 py-2 rounded-md transition-all duration-200 ${
+        isActive
+          ? "bg-blue-600 text-white shadow-lg scale-105"
+          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+      }`}
+      onClick={() => setIsActive(!isActive)}
+    >
+      상호작용 버튼
+    </button>
+  );
+}
+```
+
+서버 컴포넌트에서는 초기 로딩에 필요한 최소한의 스타일만 적용하고, 클라이언트 컴포넌트에서는 복잡한 상호작용과 애니메이션을 담당합니다.
+이렇게 하면 첫 화면 표시 시간이 단축되고, 사용자 경험이 더 부드러워집니다.
+
+## 스타일링 전략의 트레이드오프
+
+### 장점
+
+- **유연한 선택지 제공**: 전역 CSS로 디자인 토큰 관리, CSS Modules로 컴포넌트 격리, Tailwind로 빠른 프로토타이핑 등 상황에 맞는 도구 선택 가능
+- **성능 최적화**: 빌드 시점 CSS 최적화와 서버/클라이언트 컴포넌트 분리로 불필요한 스타일 로드 방지 및 로딩 속도 개선
+- **개발자 경험 향상**: 핫 리로딩으로 빠른 피드백, 타입 안전성으로 IDE 지원 강화, 파일 기반 구조로 스타일 관리 용이
+- **확장성**: App Router의 폴더 구조와 자연스럽게 결합되어 대규모 앱에서도 체계적인 스타일 관리 가능
+
+### 단점
+
+- **선택의 어려움**: 전역/CSS Modules/Tailwind 중 어떤 전략을 선택할지, 또는 어떻게 혼합할지 결정하기 어려움
+- **충돌 관리 복잡성**: 대규모 앱에서 CSS Modules 간 클래스명 충돌, Tailwind 유틸리티 간 우선순위 충돌 관리 필요
+- **마이그레이션 비용**: 기존 CSS-in-JS나 전통적 CSS에서 Next.js 스타일링으로 전환 시 리팩토링 작업량 증가
+
+### 균형 맞추기 팁
+
+팀 규모와 프로젝트 성격에 맞는 전략을 수립하세요. 소규모 팀에서는 Tailwind로 빠른 개발을, 대규모 팀에서는 CSS Modules로 컴포넌트 격리를 우선하세요. 보통은 전역 CSS로 디자인 토큰을 관리하고, 컴포넌트별로는 CSS Modules나 Tailwind를 선택하는 혼합 방식을 추천합니다.
+
+## 예상 질문
+
+**Q. CSS Modules와 Tailwind 중 어느 것을 선택해야 할까요?**
+
+프로젝트 규모와 팀 선호도에 따라 다릅니다. 소규모 프로젝트나 빠른 프로토타이핑에서는 Tailwind가 효율적입니다. 대규모 프로젝트나 디자인 시스템이 복잡한 경우에는 CSS Modules나 CSS-in-JS가 더 적합할 수 있습니다. 두 가지를 혼합해서 사용하는 경우가 있습니다.
+
+**Q. 다크 모드 지원은 어떻게 구현하나요?**
+
+CSS 변수와 data 속성을 활용하는 것이 좋습니다. 루트 레벨에서 다크 모드용 변수를 정의하고, `prefers-color-scheme` 미디어 쿼리나 사용자 설정에 따라 data-theme 속성을 변경하세요.
+
+## 요약
+
+- **Next.js 본질**: 파일 기반 App Router 구조와 결합된 다층적 스타일링 아키텍처
+- **주요 강점**: 전역 CSS/CSS Modules/Tailwind의 균형 잡힌 통합, 빌드 시점 최적화, 서버/클라이언트 경계 활용
+- **핵심 차별화**: 라우트 그룹별 자동 스타일 계층화와 컴포넌트별 캡슐화
+
+## 참조
+
+- Next.js 공식문서 – [CSS Styling](https://nextjs.org/learn/dashboard-app/css-styling)
+- Next.js 공식문서 – [Optimizing Fonts and Images](https://nextjs.org/learn/dashboard-app/optimizing-fonts-images)

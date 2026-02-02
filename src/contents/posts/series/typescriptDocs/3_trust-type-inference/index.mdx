@@ -1,0 +1,206 @@
+---
+title: '기본 타입 - "추론"을 믿으세요'
+publishedAt: '2025-10-22'
+summary: '타입 추론 믿고 `: string` 생략해도 안전'
+category: '개발'
+series: 'typescriptDocs'
+image: '/contents/posts/series/typescriptDocs/images/3.png'
+---
+
+
+## 들어가며
+
+리액트에서 간단한 사용자 정보를 가져오는 함수를 짜다가, 코드를 여러 줄로 분리해 놓은 뒤 `responseJson.profilePicture.url.toLowerCase()`를 한 줄로 쭉 써 넣었습니다. 테스트에서는 별 문제가 없었고, user 객체가 존재하는 줄 알았죠. 그런데 프로덕션 로그에는 `TypeError: Cannot read properties of undefined (reading 'toLowerCase')`가 떴습니다. 실제로 프론트엔드가 처음엔 `profilePicture`를 보내지 않았기 때문에, 어디선가 `undefined`가 들어왔고, JS는 아무 경고 없이 `toLowerCase()`를 호출하게 내버려뒀습니다.
+
+이런 상황에서 TypeScript가 제안하는 첫 단계는 "이 값이 어떤 모양인지 컴파일러에게 알려주는 것"입니다. 게다가 대부분 의도는 명시할 필요도 없습니다. TypeScript는 코드를 보고 "아, 이 값은 문자열일 것이다"라고 추론해서, 제가 실수하기 전에 빨간 줄로 멈춰줍니다.
+
+## TypeScript의 제안
+
+TypeScript에서는 `fetchUserProfile`의 반환값을 `any`로 두지 않고, `profilePicture`가 없을 수도 있다는 사실을 그대로 표현합니다. 타입 추론을 믿으면서도 안전하게 다룰 수 있는 방법을 제안합니다.
+
+### 기본 타입 선언: 옵셔널 속성으로 안전하게 표현
+
+```ts
+type UserProfile = {
+  id: number;
+  nickname: string;
+  profilePicture?: {
+    url: string;
+  };
+};
+
+async function fetchUserProfile(id: number): Promise<UserProfile> {
+  const res = await fetch(`/api/users/${id}`);
+  const body = (await res.json()) as UserProfile;
+  return body;
+}
+
+const profile = await fetchUserProfile(42);
+console.log(profile.profilePicture?.url.toLowerCase());
+```
+
+TypeScript는 `UserProfile` 타입을 보고 `profile`이 어떤 구조를 가질지 추론합니다. `profilePicture`에 `?`가 붙어 있으므로 "이 속성은 없을 수도 있다"는 걸 알고, `profilePicture?.url`처럼 옵셔널 체이닝을 허용합니다. `profile.profilePicture`가 `undefined`면 `.toLowerCase()`는 실행되지 않아 런타임 오류를 방지합니다.
+
+> **참고**: `tsconfig`에서 `noImplicitAny`를 켜면, 타입이 없는 상태로 함수나 콜백을 쓰면 컴파일이 실패합니다. 초반에는 불편해도, 모든 값을 "정말 모르겠다"는 의미의 `unknown`이나 별도 타입으로 좁힐 수밖에 없어서 추론을 믿게 됩니다.
+
+## 심층 분석
+
+### 1) 기본 추론: 초기값으로 타입 결정
+
+TypeScript는 변수의 초기값을 보고 타입을 추론합니다. `const result = 0;`이라면 `result`는 `number`가 됩니다. `const config = { method: "POST" };`는 `method: "POST"`라는 더 좁은 리터럴 타입이 됩니다.
+
+```ts
+// 기본 추론 예시
+const userId = 42; // number로 추론
+const userName = "alice"; // string으로 추론
+const isActive = true; // boolean으로 추론
+const config = { method: "POST" }; // { method: "POST" }로 추론
+```
+
+TypeScript 컴파일러는 할당된 값의 타입을 보고 자동으로 타입을 부여합니다. 리터럴 값("POST")의 경우 더 좁은 타입으로 추론되어, `config.method = "GET"`처럼 다른 값을 할당하려 하면 오류가 발생합니다.
+
+### 2) 유틸리티 타입 활용: 함수 반환값 추론
+
+`ReturnType` 같은 유틸리티 타입을 활용하면 함수의 반환 타입을 추론할 수 있습니다.
+
+```ts
+function sendUserData(body: ReturnType<typeof fetchUserProfile>) {
+  // body는 UserProfile 타입으로 추론됩니다.
+  console.log(`사용자 ${body.nickname}의 데이터 전송`);
+
+  if (body.profilePicture) {
+    // 이 블록 안에서는 profilePicture가 존재하는 것으로 추론됩니다.
+    console.log(`프로필 이미지: ${body.profilePicture.url}`);
+  }
+}
+```
+
+`ReturnType<typeof fetchUserProfile>`는 `fetchUserProfile` 함수의 반환 타입(`Promise<UserProfile>`)을 추출한 후 Promise를 벗겨낸 `UserProfile` 타입을 얻습니다. 조건문 `if (body.profilePicture)` 안에서는 TypeScript가 "이 시점에서는 값이 존재한다"고 추론하여 더 좁은 타입으로 다룰 수 있게 합니다.
+
+### 3) 구조적 타이핑과 추론의 결합
+
+TypeScript의 추론은 이름을 보는 대신 **구조(Shape)**을 봅니다. API 응답을 `UserProfile`로 선언하면 구조적 타이핑이 작동합니다.
+
+```ts
+// 구조적 타이핑 예시
+const apiResponse = {
+  id: 123,
+  nickname: "alice",
+  profilePicture: { url: "https://example.com/photo.jpg" },
+};
+
+// UserProfile 타입과 모양이 맞으므로 할당 가능
+const user: UserProfile = apiResponse;
+console.log(user.profilePicture?.url); // 안전하게 접근
+```
+
+TypeScript는 타입 이름을 비교하지 않고 객체의 속성과 타입 구조를 비교합니다. `apiResponse`가 `UserProfile`이 요구하는 모든 필드(`id: number`, `nickname: string`, `profilePicture?: { url: string }`)를 가지고 있으므로 호환됩니다.
+
+### 4) 엄격 모드에서 추론 믿기
+
+`any` 없이 타입 추론을 믿으려면 `noImplicitAny`와 `strict` 모드를 켜야 합니다.
+
+```ts
+// strict 모드에서 강제되는 추론
+function processUser(userId: number) {
+  // userId는 명시적으로 number 타입
+  const profile = await fetchUserProfile(userId);
+  // profile은 UserProfile로 추론됨
+
+  return profile.nickname.toLowerCase(); // 안전하게 사용
+}
+```
+
+`strict` 모드에서는 모든 값의 타입을 명시적으로 지정하거나 추론할 수 있어야 합니다. `any`를 사용하면 타입 검사가 무용지물이 되므로, TypeScript는 더 엄격한 추론을 강제합니다. 이 과정에서 "이 값이 정말 string일까?"라는 질문을 스스로 하게 됩니다.
+
+## 실전 패턴 (In React)
+
+### 리액트 컴포넌트: useState와 추론의 조합
+
+리액트에서는 `useState`의 초기값에 따라 타입이 추론됩니다. `null`을 초기값으로 주면 유니온 타입이 됩니다.
+
+```tsx
+type UserProfile = {
+  id: number;
+  nickname: string;
+  profilePicture?: { url: string };
+};
+
+function ProfileCard({ userId }: { userId: number }) {
+  // 초기값 null로 UserProfile | null 타입 추론
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadUserData() {
+      const data = await fetchUserProfile(userId);
+      if (!cancelled) setProfile(data);
+    }
+
+    loadUserData();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  if (!profile) {
+    return <p>불러오는 중...</p>;
+  }
+
+  return (
+    <div>
+      <h2>{profile.nickname}</h2>
+      <img
+        src={profile.profilePicture?.url ?? "/default-avatar.png"}
+        alt={`${profile.nickname}의 프로필 사진`}
+      />
+    </div>
+  );
+}
+```
+
+`useState<UserProfile | null>(null)`에서 제네릭을 명시했으므로 `profile`은 `UserProfile | null`로 추론됩니다. JSX에서는 `null` 체크를 반드시 해야 하며, 옵셔널 체이닝(`?.`)과 널리시 병합(`??`)을 함께 써서 안전하게 기본값을 제공합니다. TypeScript는 각 단계에서 타입 안전성을 보장합니다.
+
+## 함정
+
+1. 화살표 함수의 매개변수에 타입을 적지 않으면 `noImplicitAny`가 에러를 뱉습니다. `data => {}`처럼 쓰면 `data`가 `any`가 되므로, `data: ApiResponse`처럼 명시하거나 `const processData = (data: ApiResponse) => {}`처럼 작성하세요.
+2. `as`를 남발하면 추론을 우회합니다. `profile as UserProfile`을 쓰기보다, `return { ...body, profilePicture: body.profilePicture ?? undefined }`처럼 조건문 안에서 자연스럽게 좁혀서 컴파일러가 추론하게 하세요.
+3. `const arr = []`로 시작하면 타입 추론은 `never[]`을 내놓으므로, `push({})` 같은 코드를 쓰면 `Argument of type '{}' is not assignable to parameter of type 'never'` 오류가 납니다. 넓은 타입을 의도하면 `const arr: UserProfile[] = [];`처럼 명시하거나, `const arr = [] as UserProfile[];`처럼 단언해서 초기 타입을 고정해 주세요. (이 방식은 JS의 `Array<any>`처럼 되는 것을 막고, `push`할 때마다 타입을 다시 생각하게 해 줍니다.)
+
+## 예상 질문
+
+**Q1. `useState(null)` 하면 어떡하죠?**  
+TypeScript는 `null`을 포함하는 타입으로 추론하므로, 렌더링 단계에서 반드시 `if (!profile) return ...;`처럼 null 체크를 하게 만듭니다. 초기값을 명시적으로 주고 싶다면 `useState<UserProfile | null>(null)`처럼 제네릭을 붙여도 됩니다.
+
+**Q2. API 스펙이 자주 바뀌는데 매번 타입을 손대야 하나요?**  
+맞습니다. 그러나 그 덕분에 변화가 나면 `tsc`가 어디를 고쳐야 하는지 알려줍니다. 필드가 없어졌다면 타입 에러가 발생하고, 자동완성도 따라와서 "이 필드가 더 이상 없다"라는 사실을 컴파일 타임에 얻습니다.
+
+**Q3. `profilePicture?.url`이 없으면 어떻게 디버깅하죠?**  
+TypeScript는 옵셔널 체이닝과 `??` 같은 연산자 조합을 제안합니다. `profile.profilePicture?.url ?? "기본값"`처럼 쓰면 런타임에도 안전하고, 나중에 진짜 `profilePicture`가 들어오면 자동으로 사용할 수 있습니다.
+
+**Q4. Typescript Playground 홈페이지에서 `const arr = []`가 `any[]`으로 보였는데 왜 다른가요?**  
+Playground의 기본 `tsconfig`(strict / noImplicitAny 꺼짐)에서는 TypeScript가 “유형을 모르겠으니 `any[]`를 쓰자”라고 판단합니다. strict를 켜면 `const arr = []`는 `never[]`로 추론되어 `arr.push({})`에 `Argument of type '{}' is not assignable to parameter of type 'never'` 오류가 뜹니다. 이런 strict 설정을 통해 타입스크립트는 “대충 추론하지 말고, 명시적으로 타입을 잡거나 허용된 타입만 넣으라”고 알려줍니다.
+
+```ts
+// strict=false (Playground 기본)
+const arr = [];
+arr.push({}); // arr: any[] → 경고 없음
+
+// strict=true
+const arr = [];
+arr.push({}); // 오류: '{}'은 'never'에 할당할 수 없음
+```
+
+Playground 오른쪽 `TS Config`에서 `strict true` / `noImplicitAny true`를 켜면 `never[]`를 보게 되고, `const arr: UserProfile[] = [];`처럼 타입을 명시해야 `push`를 통과시킬 수 있습니다. 이번 편에서 소개한 “초기 선언에 타입을 붙여 생각하게 만드는” 흐름을 만드는 출발점이라 볼 수 있습니다.
+
+## 요약
+
+TypeScript의 타입 추론은 "값을 꼭 적지 않아도 괜찮다"는 마음을 주면서도, 실제로는 `number`, `string`, `UserProfile`이라는 계약을 자동으로 인정합니다. `any` 없이 inference를 믿으면, PR마다 "이 값이 무엇인지"를 묻는 습관이 생기고, 결과적으로 JS에서 놓쳤던 `profilePicture` 같은 널로 인한 런타임 오류를 컴파일 타임에 막을 수 있습니다.
+
+타입을 한 줄씩 적는 것이 아니라, 코드 흐름 안에서 TypeScript가 "이건 이런 모양이겠구나"라고 이해하도록 돕는 것이 핵심입니다. 이런 습관이 쌓일수록 JS 개발자로서의 직감은 건드리지 않으면서도, 런타임 버그를 줄이는 설계 도구로서 TypeScript를 더 믿을 수 있게 됩니다.
+
+## 참조
+
+- TypeScript 공식문서
+  - [Everyday Types](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html)

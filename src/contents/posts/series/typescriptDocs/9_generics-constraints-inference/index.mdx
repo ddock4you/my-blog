@@ -1,0 +1,217 @@
+---
+title: '제네릭(Generics) 2부 - 제약조건과 추론'
+publishedAt: '2025-10-28'
+summary: 'extends로 제네릭 허용 범위 조절'
+category: '개발'
+series: 'typescriptDocs'
+image: '/contents/posts/series/typescriptDocs/images/9.png'
+---
+
+## 들어가며
+
+3-2편에서 소개한 `useData<T>` 훅을 쓰면서, 점점 더 다양한 호출부에서 “T에는 무엇을 넣어도 된다”는 생각으로 쓰게 되었습니다. 하지만, 어떤 컴포넌트에서는 `data`가 반드시 `id`를 가져야 하고, 다른 곳에서는 `data`가 `id`뿐 아니라 `createdAt`도 가져야 했습니다. 결국 `useData<ApiResponse>`를 쓰면 `ApiResponse` 안에 `payload`, `meta` 등 원하는 정보가 모두 들어가 버리기에, 실제로는 `id`를 기대하는 위치에서 그 값을 보장받지 못했죠. 런타임에서 `data.id`가 없으면 TypeError가 났고, 호출부마다 “이 데이터는 어떤 속성이 있다고 가정하는지”를 정리해야 했습니다.
+
+```ts
+const { data } = useData<{ id?: string; createdAt?: string }>("/status");
+console.log(data?.id.toUpperCase()); // id가 없으면 런타임 예외
+```
+
+`data`에 어떤 정보가 보장되어야 하는지 호출부가 직접 표기하지 않으니, TypeScript의 제네릭 추론도 “모든 것이 옵셔널”이라고 받아들여 버립니다. 3-2편에서 제네릭을 도입하긴 했지만, 이제는 “제네릭에 경계(boundary)를 걸어서, 반드시 가져야 할 속성을 명시해 두는” 단계로 넘어가야 합니다.
+
+## TypeScript의 제안
+
+제네릭 타입 파라미터에 제약을 추가하면 타입 안전성을 더욱 강화할 수 있습니다. 데이터 객체의 필수 속성을 보장하는 방법을 제안합니다.
+
+### 제약 조건으로 필수 속성 보장
+
+`extends` 키워드로 제네릭 타입에 구조적 제약을 추가할 수 있습니다.
+
+```ts
+type WithId = { id: string };
+
+function useEntity<T extends WithId>(url: string) {
+  // T는 반드시 id 속성을 가지고 있어야 함
+  return fetchJson<T>(url);
+}
+
+// 허용: id 속성이 있음
+const entity = useEntity<{ id: string; name: string }>("/entity");
+console.log(entity.id); // id 속성 보장됨
+
+// 컴파일 오류: id 속성이 없음
+// const invalid = useEntity<{ name: string }>("/entity");
+```
+
+`T extends WithId` 제약은 "T는 반드시 WithId 인터페이스를 만족해야 한다"는 의미입니다. 이를 통해 함수 내부에서 `id` 속성을 안전하게 사용할 수 있고, 호출자는 반드시 필요한 속성을 포함한 타입을 전달해야 합니다.
+
+## 심층 분석
+
+### 1) 구조적 제약의 유연함
+
+`extends`는 최소한의 구조를 보장하면서도 추가 속성을 허용하는 유연한 제약입니다.
+
+```ts
+function assertHasId<T extends { id: string }>(value: T): void {
+  console.log(value.id); // id 속성 보장됨
+}
+
+// 허용되는 호출들
+assertHasId({ id: "user123", name: "김개발" }); // 추가 속성 허용
+assertHasId({ id: "prod456", price: 1000, category: "A" }); // 여러 추가 속성 허용
+
+// 컴파일 오류: id 속성 없음
+// assertHasId({ name: "이름만 있음" });
+```
+
+`T extends { id: string }`은 "T는 최소한 id 속성을 가져야 한다"는 의미로, 추가 속성은 자유롭게 가질 수 있습니다. 이를 통해 타입 안전성을 유지하면서도 유연성을 확보할 수 있습니다.
+
+### 2) 속성 키 조작의 고급 패턴
+
+`keyof`와 `typeof`를 결합하면 런타임 객체의 구조를 타입 시스템으로 가져와 타입 안전성을 확보할 수 있습니다.
+
+```ts
+// 런타임 설정 객체
+const API_ENDPOINTS = {
+  users: "/api/users",
+  posts: "/api/posts",
+  comments: "/api/comments",
+} as const;
+
+// 런타임 객체의 키들을 타입으로 변환
+type ApiEndpoint = keyof typeof API_ENDPOINTS; // "users" | "posts" | "comments"
+type ApiUrl = (typeof API_ENDPOINTS)[ApiEndpoint]; // "/api/users" | "/api/posts" | "/api/comments"
+
+// 타입 안전한 API 클라이언트
+function fetchFromApi(endpoint: ApiEndpoint): Promise<unknown> {
+  const url = API_ENDPOINTS[endpoint]; // 타입 안전하게 접근
+  return fetch(url).then((res) => res.json());
+}
+
+// 실제 사용
+const users = await fetchFromApi("users"); // ✅ 허용
+const posts = await fetchFromApi("posts"); // ✅ 허용
+
+// 컴파일 오류: 존재하지 않는 엔드포인트
+// const invalid = await fetchFromApi("admin"); // ❌ 오류
+```
+
+`keyof typeof API_ENDPOINTS`는 런타임 객체의 모든 키를 유니온 타입으로 만들고, `(typeof API_ENDPOINTS)[ApiEndpoint]`는 해당 키들의 값 타입을 추출합니다. 이를 통해 객체의 구조 변경 시 타입도 자동으로 업데이트됩니다.
+
+### 3) 조건부 타입으로 타입 재구성
+
+조건부 타입과 `infer` 키워드를 사용해 기존 타입에서 특정 부분을 추출할 수 있습니다.
+
+```ts
+type ApiResponseData<T> = T extends { data: infer D } ? D : never;
+
+type UserResponse = ApiResponseData<{ data: User[]; meta: {} }>; // User[]
+type SingleUserResponse = ApiResponseData<{ data: User; meta: {} }>; // User
+type InvalidResponse = ApiResponseData<{ error: string }>; // never
+
+// 실제 사용 예시
+async function fetchUsers() {
+  const response = await fetchJson<{ data: User[]; meta: Pagination }>("/users");
+  const users: User[] = response.data; // 타입 안전하게 추론됨
+}
+```
+
+`infer D`는 "T가 data 속성을 가지고 있다면 그 타입을 D로 추론하라"는 의미입니다. 이를 통해 복잡한 중첩 타입에서 필요한 부분만 추출할 수 있습니다.
+
+### 4) 상수 객체의 키를 타입으로 활용
+
+런타임 상수 객체의 키를 타입으로 변환하는 고급 패턴입니다.
+
+```ts
+const USER_ROLES = {
+  admin: "ADMIN",
+  user: "USER",
+  guest: "GUEST",
+} as const;
+
+type UserRole = keyof typeof USER_ROLES; // "admin" | "user" | "guest"
+type UserRoleValue = (typeof USER_ROLES)[UserRole]; // "ADMIN" | "USER" | "GUEST"
+
+// 실제 활용
+function hasPermission(role: UserRole, requiredRole: UserRole): boolean {
+  const roleValues = {
+    admin: 3,
+    user: 2,
+    guest: 1,
+  };
+
+  return roleValues[role] >= roleValues[requiredRole];
+}
+
+hasPermission("user", "guest"); // true
+hasPermission("guest", "admin"); // false
+```
+
+`keyof typeof USER_ROLES`는 상수 객체의 모든 키를 유니온 타입으로 만듭니다. 이를 통해 런타임 값과 타입 정의를 일관되게 유지할 수 있습니다.
+
+## 실전 패턴 (In React)
+
+### 폼 컴포넌트의 타입 안전한 추상화
+
+제네릭을 활용해 다양한 타입의 폼 필드를 타입 안전하게 추상화할 수 있습니다.
+
+```tsx
+type FormField<T> = {
+  value: T;
+  onChange: (value: T) => void;
+};
+
+function TextField(props: FormField<string>) {
+  return <input value={props.value} onChange={(e) => props.onChange(e.target.value)} />;
+}
+
+function NumberField(props: FormField<number>) {
+  return (
+    <input
+      type="number"
+      value={props.value}
+      onChange={(e) => props.onChange(Number(e.target.value))}
+    />
+  );
+}
+
+function UserForm() {
+  const [name, setName] = useState("김개발");
+  const [age, setAge] = useState(25);
+
+  return (
+    <div>
+      <TextField value={name} onChange={setName} />
+      <NumberField value={age} onChange={setAge} />
+    </div>
+  );
+}
+```
+
+`FormField<T>` 제네릭은 `value`와 `onChange`의 타입을 `T`로 통일합니다. 각 컴포넌트는 자신만의 타입을 지정받아 타입 안전성을 유지하면서도, 공통 인터페이스로 재사용할 수 있습니다.
+
+## 함정
+
+1. `extends`를 무턱대고 붙이면 유연성이 떨어집니다. 필요한 속성만 최소한으로 제한하고, 나머지는 오픈해두세요.
+2. `infer`를 남용하면 타입이 복잡해져 이해하기 힘듭니다. 중요한 추론만 사용할 때는 주석이나 타입 별칭으로 의도를 설명해 주세요.
+3. `keyof typeof` 패턴에서 `as const`를 빼먹으면 리터럴 타입 대신 일반적인 타입으로 추론되어 유연성이 떨어집니다. 상수 객체를 타입으로 활용할 때는 반드시 `as const`를 붙여주세요.
+
+## 예상 질문
+
+**Q1. `extends`를 쓰면 타입이 너무 좁아지는 거 아닌가요?**  
+필요한 필드만 강제하고 나머지는 `T`에 맡기면 충분히 유연합니다. 오히려 “무슨 속성이 필요한지”를 명확히 문서화할 수 있어, 의도치 않은 프로퍼티 접근을 줄입니다.
+
+**Q2. `infer`는 언제 써야 하나요?**  
+다른 제네릭 타입에서 일부를 재사용하거나, `Promise`나 `ReturnType`에서 결과 타입만 뽑고 싶을 때 사용합니다. 대신 처음에는 `infer`를 피하고, `type Result = ReturnType<typeof fn>`처럼 내장 유틸리티를 활용해도 됩니다.
+
+**Q3. `keyof T`와 `keyof typeof`는 뭐가 다른가요?**  
+`keyof T`는 타입 `T`의 키를 의미하고, `keyof typeof VALUE`는 실제 값 `VALUE`의 키를 의미합니다. `typeof`를 섞으면 런타임 상수에서 타입을 끌어올 수 있어, const 객체와 같이 사용하는 데 강력합니다.
+
+## 요약
+
+3-2편에서 시작한 제네릭 이야기를 이제 제약과 추론으로 확장했습니다. `extends` 키워드로 구조적 제약을 추가해 필수 속성을 보장하고, `keyof`와 `typeof`를 결합해 런타임 객체의 구조를 타입 시스템으로 가져올 수 있습니다. `infer` 키워드를 활용한 조건부 타입으로 복잡한 타입 관계를 재구성하고, `FormField<T>` 같은 패턴으로 React 컴포넌트에서도 타입 안전성을 확보할 수 있습니다.
+
+## 참조
+
+- TypeScript 공식문서
+  - [Generics](https://www.typescriptlang.org/docs/handbook/2/generics.html)
+  - [Keyof and Indexed Access Types](https://www.typescriptlang.org/docs/handbook/2/indexed-access-types.html)

@@ -1,0 +1,343 @@
+---
+title: '(2/2) 레거시 친화 스택에서 디자인 시스템 개편하기'
+publishedAt: '2026-02-01'
+summary: ''
+category: '개발'
+image: '/contents/posts/2_redesign-system-for-legacy-stack/images/design_system_2.png'
+---
+
+1부에서는 Express + EJS + SCSS라는 레거시 환경을 유지한 채로, 디자인 기준이 코드에 안전하게 전달되도록 **토큰 기반 스타일 파이프라인을 구축**하는 과정에 집중했습니다.
+
+디자인 토큰은 Figma에서 정의되어 JSON을 거쳐 SCSS/CSS로 변환되었고, 컴포넌트 코드는 더 이상 픽셀이나 색상 값이 아닌 **의미 있는 이름(토큰)** 만을 사용하게 되었습니다.
+
+이제 남은 과제는 이 토큰을 실제 UI 구성 요소에 적용하고, 운영 환경에서 **지속적으로 사용할 수 있는 형태로 정착시키는 것**입니다.
+
+2부에서는 다음 내용을 다룹니다.
+
+- 토큰을 기반으로 한 **아이콘 시스템 설계 및 관리**
+- 레거시 환경에 맞춘 **UI 컴포넌트 구현 방식**
+- Storybook 없이도 기준을 공유할 수 있는 **가이드 페이지(`/guide`) 구성**
+
+---
+
+## 2부에서 진행된 작업 파이프라인 구성도 (아이콘 · 컴포넌트)
+
+2부에서는 1부에서 구축한 토큰 기반 스타일 파이프라인을 그대로 활용하면서, 아이콘과 UI 컴포넌트를 **실제로 운영 가능한 형태로 관리하기 위한 흐름**을 추가로 구성했습니다.
+  
+아이콘과 컴포넌트 각각에 대해 **“단일 소스(Source of Truth)를 정하고, 자동 생성된 결과물을 가이드 페이지에서 확인한다”**는  공통된 운영 패턴을 적용하는 것입니다.
+
+아래 구성도는 2부에서 다룰 작업을 이 공통 패턴 기준으로 정리한 것입니다.
+
+<img src="/contents/posts/2_redesign-system-for-legacy-stack/images/design_system_2.png" />
+
+---
+
+## 1) SCSS SVG 아이콘 시스템: 등록과 사용
+
+이 프로젝트에서 아이콘은 “에셋 파일”이 아니라 **UI 규칙의 일부**로 취급했습니다.
+그래서 파일 시스템이 아니라, SCSS 레지스트리를 단일 소스로 삼는 방식을 선택했습니다.
+
+아이콘이 파일로만 흩어져 있으면,
+
+- 어떤 아이콘이 “정답”인지 찾기 어렵고
+- 화면마다 서로 다른 방식으로 붙게 되고(파일 경로/인라인/배경 이미지 등)
+- 결국 이름과 스타일이 서서히 파편화됩니다.
+
+그래서 2부에서는 아이콘도 토큰/컴포넌트와 동일하게 **단일 소스(Source of Truth)를 정하고, 그 소스에서 파생 결과물을 자동 생성해 확인하는 루프**를 만들었습니다.
+
+### 구성
+
+- 등록(단일 소스): `src/client/scss/icons/_icons.scss`
+- API(함수/믹스인): `src/client/scss/icons/_registry.scss`
+- 가이드 생성기: `src/client/scripts/icons-to-json.cjs`
+- 가이드 데이터(생성물): `src/server/generated/icons.json`
+- 가이드 페이지: `/guide/icons` (`src/client/views/pages/guide/icons.ejs`)
+
+아이콘은 “SCSS에 등록된 목록”이 단일 소스가 되며, 가이드 페이지는 이 단일 소스를 기준으로 자동 생성됩니다.
+
+### 등록 예시
+
+```scss
+@use "./registry" as icon;
+
+@include icon.ds-register-icon(
+  "sun",
+  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='black' d='...'/></svg>"
+);
+```
+
+여기서 “SCSS에 SVG 문자열을 넣는 방식”이 낯설 수 있는데, 이 샘플에서는 아래 목적을 위해 선택했습니다.
+
+- **등록 목록을 한 곳에서 관리**하고(단일 소스)
+- **SCSS에서 바로 사용할 API**(`ds-icon`, `ds-icon-url`)를 제공하고
+- **가이드 페이지가 목록을 자동으로 읽어**(스크립트가 SCSS를 파싱) 검색/복사를 제공하게 만들기
+
+### 등록 규칙(운영을 위해 반드시 필요했던 제약)
+
+이 구조는 “등록 형식이 일정하다”는 전제 위에 돌아갑니다. 특히 `icons-to-json.cjs`는 SCSS 파일을 정규식으로 파싱하기 때문에, 운영 규칙을 최소한으로 정해두는 편이 안전했습니다.
+
+- **이름과 SVG는 “쌍따옴표” 문자열**로 등록합니다.
+- SVG 안에서는 **홑따옴표**를 사용합니다. (SVG 문자열 내부에 쌍따옴표가 들어가면 파서가 깨질 수 있어요)
+- mask 방식(단색)을 기본으로 쓰기 위해, SVG path는 **단색 채우기(`fill='black'`)**를 전제로 둡니다.
+
+이 제약들은 “깔끔한 구현”을 위한 것이 아니라, **운영 중에 예외가 생기지 않게 하기 위한 최소한의 안전장치**였습니다.
+
+### 사용 예시(단색 아이콘: mask 방식)
+
+```scss
+@use "../icons/registry" as icon;
+
+.theme-btn::before {
+  content: "";
+  @include icon.ds-icon("sun", 14px, currentColor);
+}
+```
+
+mask 방식은 SVG를 “색이 들어간 이미지”로 쓰는 대신, SVG를 “형태(마스크)”로 사용하고 실제 색은 `background-color`로 채우는 방식입니다.
+
+- 아이콘 형태: `mask-image` (SVG data-uri)
+- 아이콘 색상: `background-color` (예: currentColor)
+
+테마와 조합했을 때 단색 아이콘을 일관되게 유지하기 쉬워, 기본 아이콘 방식으로 선택했습니다.
+
+### SCSS API(실제로 제공되는 것)
+
+아이콘 레지스트리의 핵심 API는 `src/client/scss/icons/_registry.scss`에 있습니다.
+
+- `icon.ds-icon-url("name")`: `url("data:image/svg+xml,...")` 형태를 반환(마스크/백그라운드 이미지 둘 다에 사용 가능)
+- `@mixin icon.ds-icon("name", 16px, currentColor)`: 단색 아이콘(마스크)
+- `@mixin icon.ds-icon-bg("name", 16px)`: 멀티컬러 아이콘(배경 이미지)
+
+### 가이드 데이터는 어떻게 생성되는가(왜 JSON이 필요한가)
+
+가이드 페이지에서 “현재 등록된 아이콘 목록”을 보여주려면, 결국 어디선가 목록을 관리해야 합니다.
+
+이 샘플에서는 그 목록을 사람이 따로 쓰지 않고, 단일 소스(`_icons.scss`)에서 자동으로 뽑아 `icons.json`을 생성합니다.
+
+```bash
+pnpm icons:json
+```
+
+이 스크립트(`src/client/scripts/icons-to-json.cjs`)는 `_icons.scss`에서 `ds-register-icon("name", "<svg...>")` 형태를 찾아,
+
+- `name`
+- `svg`(원문)
+- `dataUri`(가이드 프리뷰를 위한 data URI)
+
+를 JSON으로 저장합니다. 결과적으로 `/guide/icons`는 “사람이 수동으로 만든 문서”가 아니라, **등록된 실체를 기반으로 한 자동 생성물**이 됩니다.
+
+### 운영 팁(레거시에서 특히 중요한 것)
+
+- mask 방식은 SVG가 “실루엣”으로 잘려야 해서 `fill='black'` 같은 단색 채우기를 전제로 두는 편이 안전했습니다.
+- 아이콘 레지스트리는 SCSS 엔트리에 포함되어야 실제로 등록이 동작합니다.
+  - 예: `src/client/scss/app.scss`에서 `@use "./icons/icons";`
+- 가이드 페이지 프리뷰는 SCSS 믹스인을 “EJS에서 직접 호출”하는 방식이 아니라, 아이콘 카드 DOM에 `--icon-url`을 주입하고(`icons.ejs`), 스타일에서 `mask-image: var(--icon-url)`로 렌더링합니다(`src/client/scss/pages/_guide-icons.scss`).
+
+다음 섹션에서는 컴포넌트도 같은 방식으로(단일 소스 + 규칙 + 가이드 페이지) 운영 루프를 만들고 조립하는 방법을 정리합니다.
+
+---
+
+## 2) EJS + SCSS로 컴포넌트 만들기(토큰 기반)
+
+이 환경에서 컴포넌트는 React 컴포넌트가 아니라 **EJS partial**이 사실상 UI 단위가 됩니다. 그래서 컴포넌트도 “모아두는 장소”와 “사용 규칙”을 먼저 만들었습니다.
+
+- 컴포넌트 템플릿: `src/client/views/components/*.ejs`
+- 컴포넌트 스타일: `src/client/scss/components/_*.scss` (entry인 `src/client/scss/app.scss`에서 `@use`로 로드)
+
+핵심은 1부와 동일합니다.
+
+> 값(픽셀/색상)을 직접 쓰지 않고, `var(--ds-...)`(테마/색) + `ds.sem-number(...)`(스케일/반응형)만으로 UI를 만든다.
+
+### 2-1. EJS 컴포넌트 작성
+
+컴포넌트는 `src/client/views/components` 폴더에 두고 EJS 템플릿으로 작성합니다.
+
+예: `src/client/views/components/button.ejs` (요약)
+
+```ejs
+<%
+  const variant = typeof locals.variant === 'string' ? locals.variant : '';
+  const size = typeof locals.size === 'string' ? locals.size : '';
+  const label = typeof locals.label === 'string' ? locals.label : '';
+  const classes = ['ds-btn', variant ? `ds-btn--${variant}` : '', size ? `ds-btn--${size}` : ''].filter(Boolean).join(' ');
+%>
+
+<% if (typeof locals.href === 'string' && locals.href) { %>
+  <a class="<%= classes %>" href="<%= locals.href %>"><%= label %></a>
+<% } else { %>
+  <button class="<%= classes %>"><%= label %></button>
+<% } %>
+```
+
+이 예시에서 중요한 부분은 “기능이 많아서”가 아니라, 가이드 페이지가 **props 없이도 렌더링**할 수 있어야 하기 때문에(안전한 기본값), 템플릿에서 `locals`를 방어적으로 다루는 습관이 필요했다는 점입니다.
+
+### 2-2. SCSS 컴포넌트 스타일 작성
+
+스타일은 `src/client/scss/components` 폴더에 작성합니다. 값 하드코딩 대신 CSS 변수와 스케일 map을 사용하도록 구성합니다.
+
+예: `src/client/scss/components/_button.scss` (요약)
+
+```scss
+@use "../abstracts/ds" as ds;
+
+.ds-btn {
+  border: 1px solid var(--ds-line);
+  color: var(--ds-text);
+  background: color-mix(in oklab, var(--ds-surface-2) 82%, transparent);
+
+  @include ds.ds-props((
+    padding: ds.sem-number(padding, 12),
+    border-radius: ds.sem-number(radius, 12)
+  ));
+}
+```
+
+여기서 `ds.ds-props()`는 “반응형 map을 받아서 base/md/... 값을 자동으로 나누어 출력”하는 믹스인입니다. 즉, 개발자는 숫자를 계산하지 않고 **토큰 스케일 키만 선택**하면 됩니다.
+
+### 2-3. 페이지에서 조립
+
+페이지에서는 `include()`로 컴포넌트를 조립합니다.
+
+```ejs
+<%- include('../../components/button.ejs', { label: 'Save', variant: 'primary' }) %>
+```
+
+여기까지가 “컴포넌트를 만들고 페이지에 적용”하는 과정입니다. 다음으로는 이 컴포넌트와 아이콘을 브라우저에서 빠르게 확인하기 위한 가이드 페이지 구축 방법을 설명합니다.
+
+---
+
+## 3) 가이드 페이지 구축(스토리북 대체): 자동 생성 + 서버 렌더
+
+가이드 페이지의 핵심은 “사람이 목록을 관리하지 않는다”는 점입니다. 단일 소스에서 목록을 자동 추출해 JSON을 만들고, 페이지는 그 JSON을 렌더링합니다.
+
+### 왜 Storybook을 쓰지 않았나
+
+처음에는 Storybook을 도입하는 방향도 검토했습니다. 컴포넌트를 문서화하고, 팀 내에서 “정답 UI”를 공유하기에 좋은 도구이기 때문입니다.
+
+다만 이 프로젝트에서는 **개발 시간이 타이트했고**, Storybook 자체를 “도입”하는 것뿐 아니라 **Storybook 방식으로 컴포넌트를 개발/유지하는 흐름을 학습할 시간**이 부족했습니다.
+
+그래서 2부에서는 Storybook의 모든 기능을 목표로 하기보다는, 운영에 필요한 최소 기능(목록/검색/프리뷰/복사/테마 확인)만 갖춘 **서버 렌더 기반 가이드 페이지**를 먼저 만들어 “기준을 확인하는 루프”를 확보하는 쪽을 선택했습니다.
+
+> 참고: 이 샘플에서는 가이드 페이지 타이틀을 영문(`Icons Guide`, `Components Guide`)으로 두었습니다. UI 문구는 팀 컨벤션에 맞춰 한글화/영문화해도 무방하며, 핵심은 “단일 소스 + 자동 생성 + 확인 루프”입니다.
+
+### 공통 패턴(쉽게 설명)
+
+1) 단일 소스(Source of truth)를 정합니다.
+2) 생성기(Generator)가 소스를 읽어 “목록/메타데이터”를 JSON으로 생성합니다.
+3) Express 라우트가 JSON을 읽어 EJS 페이지를 렌더링합니다.
+4) 브라우저에서 검색/복사/프리뷰로 확인합니다.
+
+```text
+Source of truth (SCSS/EJS)
+  -> Generator (Node script)
+    -> src/server/generated/*.json
+      -> Express route + EJS page
+```
+
+### 라우트 연결(Express)
+
+가이드 페이지는 일반 페이지와 동일하게 Express 라우트로 연결됩니다.
+
+```ts
+// src/server/routes/index.ts (요약)
+app.get("/guide/icons", guideController.icons);
+app.get("/guide/components", componentsGuideController.index);
+```
+
+### 아이콘 가이드
+
+- 단일 소스: `src/client/scss/icons/_icons.scss`
+- 생성기: `src/client/scripts/icons-to-json.cjs`
+- 생성물: `src/server/generated/icons.json`
+- 페이지: `src/client/views/pages/guide/icons.ejs`
+- URL: `/guide/icons`
+
+### 컴포넌트 가이드
+
+- 단일 소스: `src/client/views/components/*.ejs`
+- 생성기: `src/client/scripts/components-to-json.cjs`
+- 생성물: `src/server/generated/components.json`
+- 예시 케이스(옵션): `src/client/guide/components.cases.json`
+- 페이지: `src/client/views/pages/guide/components.ejs`
+- URL: `/guide/components`
+
+컴포넌트 가이드는 “기본 예시”를 자동으로 만들되, 화면 맥락이 필요한 컴포넌트는 `components.cases.json`으로 예시를 오버라이드할 수 있게 두었습니다. (예: props 조합이 여러 개인 컴포넌트)
+
+- 기본 예시: `src/client/scripts/components-to-json.cjs`의 `defaultExamplesFor()`
+- 오버라이드: `src/client/guide/components.cases.json`
+
+이 방식은 “추가/삭제/변경”이 단일 소스에만 발생하고, 가이드 페이지는 자동으로 따라오게 만드는 데 목적이 있습니다.
+
+### (중요) 가이드 페이지의 UX는 어디에서 구현되나
+
+이 샘플의 가이드는 Storybook 수준의 복잡한 문서화는 하지 않지만, 운영에 필요한 최소 기능은 제공합니다.
+
+- **검색/필터**: 아이콘/컴포넌트 이름 기준 필터
+- **복사**: 아이콘 이름 / SCSS 사용 스니펫 / EJS include 스니펫 복사
+- **테마 토글**: `data-theme` 전환(토큰 기반 테마 즉시 확인)
+
+이 동작은 `src/client/main.ts`에 구현되어 있고, 빌드 후 `src/public/js/client/main.js`로 제공됩니다.
+
+---
+
+## 4) 운영 루프
+
+2부에서 강조하고 싶은 운영 루프는 다음과 같습니다.
+
+- 변경은 한 곳에서
+  - 토큰: `src/client/tokens/*` → `pnpm tokens:scss`
+  - 아이콘: `src/client/scss/icons/_icons.scss`
+  - 컴포넌트: `src/client/views/components/*.ejs` + `src/client/scss/components/*`
+- 확인은 한 곳에서
+  - `/guide/icons`
+  - `/guide/components`
+
+운영 중에는 “소스를 바꾼 뒤 가이드가 따라오나”만 확인하면 됩니다.
+
+```bash
+pnpm gen
+```
+
+### dev 환경에서의 주의점(한 번만 겪어도 체감되는 포인트)
+
+이 샘플의 `pnpm dev`는 `dev:scss`에서 시작할 때 `pnpm gen`을 **한 번 실행**한 뒤 `sass --watch`로 들어갑니다.
+
+즉, 개발 중에 `_icons.scss`나 `views/components/*.ejs`를 수정하면:
+
+- SCSS 변경은 `sass --watch`가 즉시 반영하지만
+- `icons.json` / `components.json`은 자동으로 다시 생성되지 않습니다.
+
+그래서 가이드 페이지 목록이 최신이 아니라고 느껴질 때는 아래 중 하나를 명시적으로 실행하면 됩니다.
+
+```bash
+pnpm icons:json
+pnpm components:json
+# 또는
+pnpm gen
+```
+
+이 운영 루프가 굴러가기 시작하면, 서버 렌더링 환경에서도 디자인 시스템을 “운영” 가능한 형태로 유지할 수 있게 됩니다.
+
+---
+
+## 2부 요약
+
+2부에서는 1부에서 만든 토큰 기반 스타일 파이프라인 위에, **아이콘과 컴포넌트를 “운영 가능한 방식”으로 올리는 과정**을 정리했습니다.
+
+- 아이콘은 `src/client/scss/icons/_icons.scss`를 단일 소스로 두고, SCSS 레지스트리 API(`ds-icon`, `ds-icon-url`)로 사용 방식을 고정했습니다.
+- 컴포넌트는 `src/client/views/components/*.ejs`를 단일 소스로 두고, 값 하드코딩 없이 `var(--ds-...)`와 `ds.sem-number(...)`만으로 스타일을 구성하도록 규칙을 잡았습니다.
+- Storybook 대신 `/guide/icons`, `/guide/components` 가이드 페이지를 만들어 “등록된 실체를 자동 생성물(JSON)로 확인”하는 루프를 만들었습니다.
+
+## 마무리
+
+이번 2부의 목표는 UI를 예쁘게 만드는 것이 아니라, 레거시(EJS/SCSS) 환경에서도 디자인 시스템이 **계속 굴러갈 수 있는 최소 운영 루프**를 만드는 것이었습니다.  
+팀 상황에 맞게 Storybook/React로 확장하더라도, 이 “단일 소스 + 생성 + 확인” 패턴은 그대로 가져갈 수 있습니다.
+
+---
+
+## 샘플 코드
+
+이번 1~2부에서 다룬 내용은 샘플 코드로도 확인할 수 있습니다.
+
+- [샘플 코드 저장소](https://github.com/ddock4you/ejs-sample-design-system)
+

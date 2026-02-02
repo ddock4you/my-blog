@@ -1,0 +1,349 @@
+---
+title: 'URL로 상태 관리 – 검색/페이지네이션 UX'
+publishedAt: '2025-09-26'
+summary: 'URL 상태+디바운싱으로 검색/페이지 유지'
+category: '개발'
+series: 'nextjsDocs'
+image: '/contents/posts/series/nextjsDocs/images/12.png'
+---
+
+## 들어가며
+
+이번 4-1편에서는 상태를 어떻게 공유하고 유지할지를 고민합니다. 검색어와 페이지 번호처럼 필수 입력을 브라우저 주소창과 동기화하면 북마크나 링크 공유, 브라우저 새로고침이 모두 예상 가능한 결과를 보여주고, 다음 사용자에게도 같은 목록을 전달할 수 있습니다. 인보이스 목록을 대표 시나리오로 삼아, React(CSR)의 상태가 가질 수밖에 없는 한계를 확인한 뒤 Next.js App Router가 이 상태를 어떻게 경계 짓는지 비교해보겠습니다.
+
+## URL 상태의 핵심 원칙
+
+`useSearchParams`와 `usePathname`은 URL을 상태 저장소처럼 다루는 결정적인 훅입니다. 단순히 쿼리를 읽어오는 수준이 아니라, "입력값 → 히스토리 → 서버 데이터"라는 전체 흐름을 일관되게 유지하는 수단입니다. 왜 이렇게 할까요? 메시지 하나를 공유하려면 해당 상태를 클라이언트 메모리에만 두면 안 됩니다. 다음 세 가지 경계를 분명히 해두면 흐름이 명확해집니다.
+
+- **클라이언트 상태**: 입력 도중 빠르게 바뀌는 값 (SearchInput 내부 value 등)
+- **URL 상태**: 공유/재현이 필요한 값 (검색어, 페이지 번호, 필터 조합)
+- **서버 상태**: URL 파라미터를 읽어서 데이터베이스 혹은 API를 호출한 다음 결과를 만든 값
+
+이 경계를 유지하면 "사용자 입력 → URL 동기화 → 서버 데이터 준비 → 렌더링"이라는 루프가 자연스럽게 이어지고, 디바운싱이나 캐시 전략, `useTransition`을 얹어도 흐름이 무너지지 않습니다. `useTransition`은 React 18에서 도입된 훅으로, 긴급하지 않은 상태 업데이트(예: URL 변경)를 비동기로 처리하여 UI 응답성을 유지합니다.
+
+## 기능 구현 및 비교
+
+대표 시나리오는 인보이스 목록입니다. 먼저 React(CSR)로 구성을 해보고 상태가 클라이언트에 갇혀 있을 때 어떤 문제가 드러나는지 살펴본 뒤, Next.js로 URL 기반 구성을 구현해보겠습니다.
+
+### 리액트 단독 구성 – 클라이언트 상태로만 유지
+
+```text
+src/
+├── components/
+│   ├── InvoiceTable.jsx
+│   ├── SearchInput.jsx
+│   └── Pagination.jsx
+├── hooks/
+│   └── useInvoices.js
+├── App.jsx
+└── main.jsx
+```
+
+```jsx
+// src/hooks/useInvoices.js
+import { useState, useEffect, useMemo } from "react";
+
+export function useInvoices() {
+  const [invoices, setInvoices] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/invoices")
+      .then((r) => r.json())
+      .then(setInvoices)
+      .finally(() => setLoading(false));
+  }, []);
+
+  return { invoices, loading };
+}
+
+export function useSearchAndPagination(invoices) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  const filteredInvoices = useMemo(() => {
+    return invoices.filter((invoice) =>
+      invoice.customerName.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [invoices, searchTerm]);
+
+  const paginatedInvoices = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredInvoices.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredInvoices, currentPage]);
+
+  const totalPages = Math.ceil(filteredInvoices.length / itemsPerPage);
+
+  return {
+    searchTerm,
+    setSearchTerm,
+    currentPage,
+    setCurrentPage,
+    paginatedInvoices,
+    totalPages,
+  };
+}
+```
+
+이 구조는 간단하지만 상태가 모두 클라이언트 메모리에 있으므로 다음과 같은 질문이 바로 떠오릅니다. 링크를 복사하면 검색어는 빠지고, 새로고침하면 첫 페이지로 돌아가며, 데이터가 많으면 브라우저 메모리를 털어 쓰게 됩니다. 이처럼 CSR 방식은 "왜 URL을 안 쓰지?"라는 의문을 자연스럽게 던집니다.
+
+### Next.js 구성 – URL을 상태 저장소로 활용
+
+```text
+app/
+├── invoices/
+│   ├── page.tsx
+│   ├── layout.tsx
+│   └── components/
+│       ├── InvoiceTable.tsx
+│       ├── SearchInput.tsx
+│       └── Pagination.tsx
+└── api/
+    └── invoices/
+        └── route.ts
+```
+
+```tsx
+// app/invoices/page.tsx
+import { InvoiceTable } from "./components/InvoiceTable";
+import { SearchInput } from "./components/SearchInput";
+import { Pagination } from "./components/Pagination";
+
+async function getInvoices(search?: string, page: number = 1) {
+  const params = new URLSearchParams();
+  if (search) params.set("search", search);
+  params.set("page", page.toString());
+  params.set("limit", "10");
+
+  const res = await fetch(`http://localhost:3000/api/invoices?${params}`, {
+    cache: "no-store",
+  });
+
+  if (!res.ok) throw new Error("인보이스를 불러오지 못했습니다.");
+  return res.json();
+}
+
+export default async function InvoicesPage({
+  searchParams,
+}: {
+  searchParams: Record<string, string | undefined>;
+}) {
+  const search = searchParams.search || "";
+  const page = parseInt(searchParams.page || "1", 10);
+  const { invoices, totalPages } = await getInvoices(search, page);
+
+  return (
+    <div>
+      <h1>인보이스 목록</h1>
+      <SearchInput initialValue={search} />
+      <InvoiceTable invoices={invoices} />
+      <Pagination currentPage={page} totalPages={totalPages} />
+    </div>
+  );
+}
+```
+
+```tsx
+// app/invoices/components/SearchInput.tsx
+"use client";
+
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useState, useEffect, useTransition } from "react";
+
+export function SearchInput({ initialValue }: { initialValue: string }) {
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [value, setValue] = useState(initialValue);
+
+  useEffect(() => {
+    setValue(searchParams.get("search") || "");
+  }, [searchParams]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    startTransition(() => {
+      const params = new URLSearchParams(searchParams);
+      if (value) {
+        params.set("search", value);
+      } else {
+        params.delete("search");
+      }
+      params.set("page", "1");
+      router.replace(`${pathname}?${params}`);
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="고객명으로 검색..."
+        disabled={isPending}
+      />
+      <button type="submit" disabled={isPending}>
+        {isPending ? "검색 중..." : "검색"}
+      </button>
+    </form>
+  );
+}
+```
+
+```tsx
+// app/invoices/components/Pagination.tsx
+"use client";
+
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useTransition } from "react";
+
+interface PaginationProps {
+  currentPage: number;
+  totalPages: number;
+}
+
+export function Pagination({ currentPage, totalPages }: PaginationProps) {
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  const handlePageChange = (page: number) => {
+    startTransition(() => {
+      const params = new URLSearchParams(searchParams);
+      params.set("page", page.toString());
+      router.replace(`${pathname}?${params}`);
+    });
+  };
+
+  return (
+    <div className="pagination">
+      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+        <button
+          key={page}
+          onClick={() => handlePageChange(page)}
+          disabled={isPending || page === currentPage}
+          className={page === currentPage ? "active" : ""}
+        >
+          {page}
+        </button>
+      ))}
+    </div>
+  );
+}
+```
+
+`SearchInput`과 `Pagination`은 클라이언트 컴포넌트에서 `useSearchParams`, `useRouter`, `useTransition`을 조합해 URL 쿼리를 업데이트합니다. 입력값을 바로 URL에 쓰지 않고 `startTransition`으로 비동기 스케줄링하며, 검색 시 페이지를 1로 리셋하는 규칙도 명시적으로 구현합니다. URL 상태가 곧 필터 상태이며 서버가 해당 URL을 읽고 필요한 데이터만 가져가기 때문에 CSR보다 공유성과 일관성이 훨씬 높아집니다.
+
+### 리액트 vs Next.js 비교표
+
+| 구분               | 리액트 (CSR + 클라이언트 상태)                 | Next.js (서버/클라이언트 + URL 상태)                                |
+| ------------------ | ---------------------------------------------- | ------------------------------------------------------------------- |
+| 실행 환경 기본값   | 브라우저에서 모든 필터링 처리                  | 서버에서 URL 파라미터 읽어 데이터 준비, 클라이언트에서 URL 업데이트 |
+| 데이터 접근 모델   | 한 번에 모든 데이터를 가져와 클라이언트 필터링 | URL 파라미터로 서버 API 호출, 페이지별/검색별 데이터만 가져옴       |
+| 번들 관점          | 모든 데이터가 클라이언트에 있어야 함           | 검색/페이지네이션 로직만 번들링, 데이터는 서버에서 준비             |
+| 컴포넌트 분리 의미 | 상태 관리와 UI 로직이 결합                     | 서버 컴포넌트(데이터 준비) + 클라이언트 컴포넌트(URL 업데이트) 분리 |
+| 설계의 제약        | 상태 공유/북마크 불가능                        | URL을 상태 저장소로 강제, 그게 공유성과 SEO의 기준이 됨             |
+
+> **참고**: URL 상태 관리는 Next.js의 프로그레시브 인핸스먼트 전략과도 맞닿습니다. JavaScript가 꺼져 있어도 `?q=react&page=2`만 있으면 서버에서 결과를 준비하고, 켜져 있다면 실시간 검색/디바운싱 같은 고급 상호작용을 얹습니다.
+
+## URL 상태 관리를 위한 체크리스트
+
+- 서버 컴포넌트에서 `searchParams`를 읽고, 실시간성이 중요한 경우 `cache: "no-store"`를 명시한다.
+- 클라이언트 컴포넌트는 `initialValue`를 props로 받아 URL과 `useState`를 동기화하고, `startTransition`으로 URL 업데이트를 비동기로 처리한다.
+- 페이지네이션처럼 히스토리 상태를 쌓아야 할 때는 `router.push`, 반복되는 입력은 `router.replace`로 처리한다.
+- 필터를 `URLSearchParams`로 직렬화하며 기본값은 쿼리에서 빼서 URL을 깔끔하게 유지한다.
+- URL과 클라이언트 상태가 충돌하면 `useEffect`로 URL을 우선하고, 클라이언트 상태를 덮어쓰는 패턴을 쓴다.
+
+## URL 상태 관리의 트레이드오프
+
+### 장점
+
+- **공유성과 SEO**: URL에 상태를 담으면 북마크/공유가 자연스럽고 검색 엔진도 해당 페이지를 색인할 수 있습니다.
+- **브라우저 내비게이션 지원**: 뒤로가기/앞으로가기를 눌러도 같은 필터 상태를 복원할 수 있습니다.
+- **서버 사이드 렌더링 호환**: URL을 기반으로 SSR/SSG 결과를 만들 수 있어 첫 페이지부터 같은 UI를 보여줍니다.
+
+### 단점
+
+- **URL 관리 복잡성**: 상태를 지나치게 많이 담으면 쿼리가 길어지고 가독성이 떨어집니다.
+- **업데이트 타이밍 제어 어려움**: 입력할 때마다 URL을 바꾸면 히스토리가 빠르게 쌓이고 성능이 저하될 수 있습니다.
+- **클라이언트-서버 불일치**: URL과 서버 데이터가 살짝 어긋날 수 있는데, 그때는 `useDeferredValue`나 `startTransition`으로 흐름을 맞춥니다.
+
+> **참고**: `useDeferredValue`는 긴급하지 않은 값(예: 검색 결과)을 지연시켜 UI 우선순위를 조절하고, `startTransition`은 긴급하지 않은 상태 업데이트를 비동기로 처리하여 응답성을 유지합니다.
+
+### 균형 맞추기 팁
+
+공유 가능한 핵심 상태(검색어, 페이지 번호, 필터)만 URL에 두고, 입력 중인 텍스트나 로딩 플래그는 클라이언트 상태로 유지하세요. `useTransition`과 `useDeferredValue`를 조합하면 URL 업데이트를 자연스럽게 지연시킬 수 있습니다.
+
+## 예상 질문 – 제가 실제로 헷갈렸던 지점들
+
+**Q1. URL 상태가 SEO에 미치는 영향은?**
+URL 파라미터가 검색 엔진에 노출되므로 검색 결과 자체가 색인될 수 있습니다. 중요한 검색 페이지에는 메타 태그도 동적으로 설정해주고, 필요하다면 robots 정책도 조절해야 합니다.
+
+**Q2. 디바운싱은 어떻게 적용하나요?**
+`useTransition`과 `useDeferredValue`를 함께 사용합니다. 입력값을 `useDeferredValue`로 지연시키고, `startTransition`으로 URL을 비동기로 바꾸면 잦은 URL 변경을 피할 수 있습니다.
+
+```typescript
+function SearchInput() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const [isPending, startTransition] = useTransition();
+  const [query, setQuery] = useState(searchParams.get("q") || "");
+  const deferredQuery = useDeferredValue(query);
+
+  useEffect(() => {
+    startTransition(() => {
+      const params = new URLSearchParams(searchParams);
+      if (deferredQuery) {
+        params.set("q", deferredQuery);
+      } else {
+        params.delete("q");
+      }
+      params.set("page", "1");
+      router.replace(`${pathname}?${params}`);
+    });
+  }, [deferredQuery, router, searchParams, pathname]);
+
+  return (
+    <input
+      value={query}
+      onChange={(e) => setQuery(e.target.value)}
+      placeholder="검색어 입력..."
+      disabled={isPending}
+    />
+  );
+}
+```
+
+**Q3. 페이지네이션에서 뒤로가기 버튼이 제대로 작동하나요?**
+네, `router.push`를 쓰면 히스토리에 상태가 쌓이고, `replace`는 같은 결과를 덮기 때문에 상황에 따라 나눠서 사용하면 됩니다.
+
+**Q4. 대량 데이터에서는 어떻게 최적화하나요?**
+서버 사이드 페이지네이션과 URL 상태를 연결하면 클라이언트는 현재 페이지 데이터만 받고, 서버가 정확한 결과를 여럿 준비합니다.
+
+**Q5. URL 상태와 클라이언트 상태가 충돌할 때 어떻게 하나요?**
+`useEffect`로 URL을 감지해 클라이언트 상태를 덮어씌우고, `initialValue` 패턴처럼 URL이 우선하도록 만들면 됩니다.
+
+**Q6. Next.js에서만 가능한 건가요?**
+다른 프레임워크에서도 URL 상태를 만들 수 있지만, Next.js는 서버 컴포넌트에서 URL 파라미터를 바로 읽어서 데이터를 준비할 수 있어 자연스럽게 연결됩니다.
+
+## 요약
+
+검색어와 페이지네이션 같은 공유 가능한 입력을 URL에 고정하면, 북마크/공유·뒤로가기/새로고침 등의 흐름이 예측 가능해집니다. React(CSR)은 상태를 클라이언트에 보관하므로 같은 UX를 만들려면 복잡한 커스텀 로직이 필요하지만, Next.js는 `useSearchParams`, `useTransition`, 서버 컴포넌트의 `searchParams`를 활용해 URL을 상태 저장소로 삼는 규칙을 간결하게 적용할 수 있습니다.
+
+- **공유성 확보**: 검색 결과와 페이지 상태가 URL에 오며 북마크/공유가 쉬워진다.
+- **SEO 개선**: 검색 파라미터를 서버가 처리하므로 검색 엔진 친화적이다.
+- **UX 향상**: 브라우저 뒤로가기로 이전 검색 상태를 그대로 복원한다.
+- **서버 최적화**: 필요한 데이터만 호출해 응답 속도와 메모리를 개선한다.
+
+## 참조
+
+- Next.js 공식문서
+  - [Adding Search and Pagination](https://nextjs.org/learn/dashboard-app/adding-search-and-pagination)
+  - [useSearchParams](https://nextjs.org/docs/app/api-reference/functions/use-search-params)
+  - [usePathname](https://nextjs.org/docs/app/api-reference/functions/use-pathname)

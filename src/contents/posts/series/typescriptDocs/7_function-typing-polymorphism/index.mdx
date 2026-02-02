@@ -1,0 +1,232 @@
+---
+title: '함수 타이핑 - 오버로딩과 다형성'
+publishedAt: '2025-10-26'
+summary: '오버로딩으로 입력별 함수 리턴 정리'
+category: '개발'
+series: 'typescriptDocs'
+image: '/contents/posts/series/typescriptDocs/images/7.png'
+---
+
+## 들어가며
+
+실제 날짜나 문자열이 들어오는 함수에서 자주 틀어졌던 기억이 있습니다. `formatDate`를 분기 없이 만들었는데, 어떤 모듈은 `Date` 객체를 넘기고, 다른 모듈은 `"2025-01-01"` 같은 ISO 문자열을 넘겼습니다. 자바스크립트에서는 `new Date(value)`처럼 한 줄로 감싸면 되니 큰 문제가 없는 것처럼 느껴졌지만, 어느 순간 `value.getFullYear()`를 바로 호출한 코드가 런타임에서 `value is not a function`을 던졌고, 개발자가 전달한 문자열이 `Date`가 아니라는 사실을 로그로 따라가며 알게 되었습니다. 모든 브라우저와 환경에서 입력이 조금씩 다른데, 그때마다 `if (typeof value === "string")` 체크를 추가하기가 번거로웠습니다.
+
+```js
+export function formatDate(value) {
+  if (value instanceof Date) {
+    return value.toLocaleDateString();
+  }
+
+  if (typeof value === "string") {
+    return new Date(value).toLocaleDateString();
+  }
+
+  return "알 수 없는 날짜";
+}
+```
+
+`value`가 들어올 때마다 타입을 직접 확인해야 하니, 함수를 사용할 때마다 “이 함수가 어떤 타입을 기대하는지” 파악하기가 힘들었고, 오타 하나가 런타임 에러로 이어졌습니다. TypeScript와 함께하면 이 함수를 쓰는 순간부터 기대값이 명확해지고, 개발자는 타입을 기억할 필요 없이 IDE에게 맡길 수 있습니다.
+
+## TypeScript의 제안
+
+TypeScript는 함수 오버로딩을 사용해 동일한 함수가 서로 다른 타입의 입력을 받아 다른 타입의 출력을 반환하도록 정의할 수 있습니다. 날짜 포맷팅 함수의 다양한 입력 타입을 처리하는 방법을 제안합니다.
+
+### 함수 오버로딩으로 타입별 처리 분리
+
+오버로딩을 사용해 입력 타입에 따라 다른 시그니처를 정의할 수 있습니다.
+
+```ts
+export function formatDate(value: Date): string;
+export function formatDate(value: string): string;
+export function formatDate(value: Date | string): string {
+  if (value instanceof Date) {
+    return value.toLocaleDateString();
+  }
+
+  return new Date(value).toLocaleDateString();
+}
+```
+
+오버로드 선언부에서는 각 입력 타입별 반환 타입을 명시하고, 구현부에서는 유니온 타입으로 실제 로직을 작성합니다. 호출 시 TypeScript는 전달된 인자의 타입에 맞는 오버로드를 선택해 적절한 타입 검사를 수행합니다.
+
+## 심층 분석
+
+> **참고: 다형성이란?**
+>TypeScript 가이드북이나 JavaScript 커뮤니티에서 다형성(polymorphism)이라고 하면 “하나의 이름이 여러 타입을 품는 능력”을 뜻합니다. 한 함수가 서로 다른 입력에 따라 적절히 동작할 수 있으면, 런타임에 지저분한 조건문 없이도 다양한 형태를 감싸줄 수 있습니다. 함수 오버로딩은 TypeScript에서 다형성을 보여주는 대표적인 도구라, 동일한 함수 이름으로 각 상황에 맞는 타입 시그니처를 나열하는 방식으로 구현합니다.
+
+### 1) 함수 시그니처의 컴파일 타임 계약
+
+JavaScript와 달리 TypeScript는 함수의 입력과 출력을 명확히 계약으로 정의합니다.
+
+```ts
+// JavaScript: 런타임에서 확인
+function processValue(value) {
+  if (typeof value === "string") {
+    return value.toUpperCase();
+  }
+  return value.toString();
+}
+
+// TypeScript: 컴파일 타임에 계약
+function processValue(value: string): string;
+function processValue(value: number): string;
+function processValue(value: string | number): string {
+  if (typeof value === "string") {
+    return value.toUpperCase();
+  }
+  return value.toString();
+}
+```
+
+오버로드 선언은 "문자열을 입력하면 문자열을 반환하고, 숫자를 입력하면 문자열을 반환한다"는 명확한 계약을 컴파일러에 전달합니다. 이를 통해 함수 사용자는 타입을 기억할 필요 없이 IDE의 도움을 받을 수 있습니다.
+
+### 2) 오버로딩의 장점: 입력 타입별 출력 타입 명시
+
+오버로딩을 사용하면 입력 타입에 따라 출력 타입을 명확히 구분할 수 있습니다.
+
+```ts
+function parseValue(value: string): number;
+function parseValue(value: number): string;
+function parseValue(value: string | number) {
+  if (typeof value === "string") {
+    return Number(value);
+  }
+
+  return value.toString();
+}
+
+// 사용 예시
+const numResult = parseValue("42"); // number 타입
+const strResult = parseValue(42); // string 타입
+```
+
+각 오버로드 시그니처(함수의 타입 선언)는 "문자열 입력 → 숫자 출력", "숫자 입력 → 문자열 출력"이라는 명확한 계약을 정의합니다. 유니온 타입만 사용할 경우 이러한 구분이 불가능합니다.
+
+### 3) 반환 타입의 정밀한 제어
+
+오버로딩을 사용하면 반환 타입도 입력 타입에 따라 정밀하게 제어할 수 있습니다.
+
+```ts
+interface User {
+  id: number;
+  name: string;
+}
+interface Product {
+  id: number;
+  title: string;
+  price: number;
+}
+
+// 서로 다른 타입 반환
+function findEntity(id: number): User;
+function findEntity(id: string): Product;
+function findEntity(id: number | string): User | Product {
+  if (typeof id === "number") {
+    // User 조회 로직
+    return { id, name: "사용자" };
+  } else {
+    // Product 조회 로직
+    return { id: Number(id), title: "상품", price: 1000 };
+  }
+}
+
+const user = findEntity(1); // User 타입
+const product = findEntity("2"); // Product 타입
+```
+
+각 오버로드 시그니처는 입력 타입에 따라 다른 반환 타입을 명시합니다. 이를 통해 함수 호출 시점에 정확한 타입 정보를 얻을 수 있습니다.
+
+### 4) 타입 가드와 오버로딩의 통합
+
+오버로딩과 타입 가드를 함께 사용하면 구현부에서도 타입 안전성을 확보할 수 있습니다.
+
+```ts
+function formatValue(value: string): string;
+function formatValue(value: number): string;
+function formatValue(value: Date): string;
+function formatValue(value: string | number | Date): string {
+  if (typeof value === "string") {
+    return value.toUpperCase();
+  }
+
+  if (typeof value === "number") {
+    return value.toFixed(2);
+  }
+
+  // value는 Date 타입으로 좁혀짐
+  return value.toLocaleDateString();
+}
+
+const result1 = formatValue("hello"); // "HELLO"
+const result2 = formatValue(3.14159); // "3.14"
+const result3 = formatValue(new Date()); // "2025. 1. 15."
+```
+
+각 조건문에서 타입이 좁혀지므로 해당 블록에서는 좁혀진 타입의 메서드와 속성을 안전하게 사용할 수 있습니다. 오버로딩 시그니처가 외부 계약을, 타입 가드가 내부 구현의 안전성을 책임집니다.
+
+## 실전 패턴 (In React)
+
+### 폼 입력 컴포넌트의 타입 안전한 값 변환
+
+React 컴포넌트에서 입력값의 타입 변환을 오버로딩으로 안전하게 처리하는 방법을 보여줍니다.
+
+```tsx
+type FormInputValue = string | number;
+
+// 오버로딩된 값 변환 함수
+function parseValue(value: string): number;
+function parseValue(value: number): string;
+function parseValue(value: string | number): string | number {
+  if (typeof value === "string") {
+    return Number(value);
+  }
+  return value.toString();
+}
+
+interface FormInputProps {
+  value: FormInputValue;
+  onChange(value: FormInputValue): void;
+}
+
+function Input({ value, onChange }: FormInputProps) {
+  function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
+    // 입력은 항상 문자열이므로 number로 변환
+    const parsed = parseValue(event.target.value);
+    onChange(parsed);
+  }
+
+  return <input value={value.toString()} onChange={handleChange} />;
+}
+```
+
+`parseValue`의 오버로딩을 통해 "문자열 입력 → 숫자 출력", "숫자 입력 → 문자열 출력"이라는 명확한 계약을 정의합니다. `handleChange`에서는 입력값을 숫자로 변환해 `onChange`에 전달하며, 타입 안전성을 유지합니다.
+
+## 함정
+
+1. 오버로드 시그니처와 구현부의 파라미터 타입이 다르면 컴파일러가 혼란을 줍니다. 구현부는 항상 “가장 넓은” 타입을 받고, 오버로드는 그 위에 얇은 층으로 쌓으세요.
+2. 반환 타입을 일반 `any`나 `unknown`으로 내버려두면 다형성을 잃습니다. 각 오버로드마다 명확한 반환 타입을 적어야 IDE가 올바른 추론을 제공합니다.
+3. 내부에서 `return`이 누락되어 `undefined`가 나올 수 있습니다. `--noImplicitReturns`를 켜고, `never`를 쓰는 패턴으로 빠진 분기를 잡으세요.
+
+## 예상 질문
+
+**Q1. 오버로드가 많으면 유지보수가 어려워지지 않나요?**  
+각 오버로드는 “이 함수가 어떤 방식으로 동작하는지”를 문서화하는 효과가 있습니다. 새로운 입력 타입이 늘어나면 그에 따라 하나씩 오버로드를 추가하면 되고, 공통 구현은 하나 두면 되므로 오히려 명확합니다.
+
+**Q2. 제네릭 하나로 `T extends string | Date`처럼 처리하면 안 되나요?**  
+제네릭은 타입 간 **관계**를 설명할 때 강력하지만, 오버로드처럼 “입력값에 따라 리턴 타입이 달라지는” 방식에는 적합하지 않습니다. 제네릭 버전은 반환 타입을 `T extends string ? number : string`처럼 표현해야 해서 읽기 어려워집니다. 오버로드는 단순한 시그니처로 표현해 주기 때문에 개발자가 더 쉽게 이해할 수 있습니다.
+
+**Q3. 오버로드가 너무 많아서 함수가 장황해지면 어떻게 하나요?**
+상당수 오버로드는 실제 구현에 영향을 주지 않는 문서화 수단입니다. IDE는 가장 적합한 시그니처 하나를 보여주므로, 필요하다면 사용 예제를 `@overload` JSDoc처럼 주석으로 정리하면서 코드 자체는 간결하게 유지하세요.
+
+**Q4. 화살표 함수에서는 오버로드를 사용할 수 없나요?**
+화살표 함수는 익명 함수이기 때문에 오버로드를 지원하지 않습니다. 오버로드는 `function` 키워드로 선언된 이름 있는 함수에서만 사용할 수 있습니다. 화살표 함수로 오버로딩이 필요하다면 `function` 키워드로 선언된 함수로 변경해야 합니다. 이는 TypeScript 컴파일러가 오버로드 시그니처를 함수 이름과 연결지어 관리하기 때문입니다.
+
+## 요약
+
+자바스크립트 함수는 매번 타입을 확인하기 때문에 “함수가 어떤 타입을 받는지”를 사용자가 기억해야 했습니다. TypeScript의 오버로드와 다형성은 그 계약을 컴파일 타임으로 밀어내며, 반환 타입과 입력 타입을 분리하여 의도하지 않은 값이 전달되는 것을 방지합니다. React 컴포넌트에서 다양한 입력을 처리할 때 오버로드를 잘 활용하면, 구현부는 `if`만 신경 쓰고 호출부는 정확한 타입을 IDE가 알려주게 됩니다.
+
+## 참조
+
+- TypeScript 공식문서
+  - [More on Functions](https://www.typescriptlang.org/docs/handbook/2/functions.html)
+  - [Functions](https://www.typescriptlang.org/docs/handbook/2/functions.html#function-overloads)

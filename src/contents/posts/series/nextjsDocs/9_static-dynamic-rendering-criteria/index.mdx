@@ -1,0 +1,473 @@
+---
+title: '정적 vs 동적 렌더링 – 선택 기준'
+publishedAt: '2025-09-23'
+summary: '페이지별 렌더링 기준 비교'
+category: '개발'
+series: 'nextjsDocs'
+image: '/contents/posts/series/nextjsDocs/images/9.png'
+---
+
+## 들어가며
+
+3-2편에서 서버 컴포넌트가 여러 데이터 소스를 `Promise.all`로 묶어 워터폴을 풀어낸 흐름을 다뤘습니다. 그때는 “우선 데이터를 병렬로 가져오는 것”에 집중했는데, 이번에는 “가져온 데이터를 어떻게 유지하고 어떤 조건에서 다시 새로 가져올지”를 판단해야 합니다.
+
+한 화면에서 블로그 글 목록은 캐시되고, 사용자 대시보드는 실시간이며, 상품 상세는 재고에 따라 선택적으로 새로 고쳐야 한다면 왜 하나의 렌더링 방법만 고집하면 안 될까요? Next.js의 `fetch`에는 `cache`와 `revalidate`가 있으므로, 각 조각에 맞는 방법을 선언적으로 지정할 수 있습니다. 이 글은 “블로그/대시보드/상품”을 대표 시나리오로 삼아, 3-2편의 병렬 패칭을 유지하면서도 세밀한 렌더링 선택 기준을 짚고 넘어가는 것을 목표로 합니다.
+
+## 정적 vs 동적 렌더링 선택 기준
+
+- **변동 빈도**: 거의 바뀌지 않는 공용 콘텐츠(회사 소개, 글 목록)는 `cache: "force-cache"`에 `revalidate`를 붙여 오래 캐시하고, 실시간 지표는 `cache: "no-store"`로 요청 시마다 업데이트한다.
+- **사용자 기대**: 검색 로봇이나 공유 링크는 빠른 초기 응답이 우선이라면 정적/ISR, 로그인한 사용자는 최신성이 필수이므로 동적 방법을 적용한다.
+- **기술적 제약과 비용**: 동적 렌더링은 매 요청마다 서버 자원을 쓰므로 CDN 캐시 계층이 이미 있는 경로부터 정적/ISR로 커버하고, 실제 시간이 중요한 경로만 `no-store`로 남겨 놓는다.
+- **의존성과 제약**: 3-2편처럼 데이터 간 독립성이 있다면 병렬로 가져오되, 렌더링 단계에서는 각각의 `fetch`에 서로 다른 캐시 옵션을 붙여 최신성 요구를 충족한다. 선후 관계가 있는 흐름은 순차 `await`로 제어한다.
+
+이 기준은 "왜 모든 데이터를 한 전략에 몰아넣으면 안 될까?"라는 질문에 대한 답입니다. 다음 섹션에서는 이 기준을 기반으로 실제 코드 흐름과 지침을 보여드리겠습니다.
+
+## 기능 구현 및 비교
+
+리액트(CSR)에서는 다양한 캐시 방법을 브라우저 단에서 직접 구현해야 했습니다. Next.js에서는 서버 컴포넌트에서 방법을 선언적으로 지정한다에서 차이가 나며, 번들과 경계, 책임 분리가 더 명확해집니다.
+
+### 리액트 단독 구성 – 브라우저에서 캐시 방법 직접 구현
+
+```text
+src/
+├── components/
+│   ├── BlogList.jsx
+│   ├── Dashboard.jsx
+│   └── ProductDetail.jsx
+├── hooks/
+│   └── useCache.js
+├── App.jsx
+└── main.jsx
+```
+
+```jsx
+// src/hooks/useCache.js - 직접 구현한 캐시 훅
+import { useState, useEffect } from "react";
+
+export function useCache(key, fetcher, ttl = 0) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const cached = localStorage.getItem(key);
+    const timestamp = localStorage.getItem(`${key}_timestamp`);
+
+    if (cached && timestamp && Date.now() - Number(timestamp) < ttl) {
+      setData(JSON.parse(cached));
+      setLoading(false);
+      return;
+    }
+
+    fetcher().then((result) => {
+      setData(result);
+      localStorage.setItem(key, JSON.stringify(result));
+      localStorage.setItem(`${key}_timestamp`, String(Date.now()));
+      setLoading(false);
+    });
+  }, [key, ttl]);
+
+  return { data, loading };
+}
+```
+
+```jsx
+// src/components/BlogList.jsx
+import { useCache } from "../hooks/useCache";
+
+export function BlogList() {
+  const { data: posts, loading } = useCache(
+    "blog-posts",
+    () => fetch("/api/posts").then((r) => r.json()),
+    3600000 // 1시간 TTL
+  );
+
+  if (loading) return <div>로딩 중...</div>;
+
+  return (
+    <div>
+      <h1>블로그 글</h1>
+      {posts?.map((post) => (
+        <article key={post.id}>
+          <h2>{post.title}</h2>
+          <p>{post.excerpt}</p>
+        </article>
+      ))}
+    </div>
+  );
+}
+```
+
+```jsx
+// src/components/Dashboard.jsx
+import { useEffect, useState } from "react";
+
+export function Dashboard() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/dashboard")
+      .then((r) => r.json())
+      .then(setData)
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div>로딩 중...</div>;
+
+  return (
+    <div>
+      <h1>대시보드</h1>
+      <div>매출: {data?.revenue}</div>
+      <div>사용자: {data?.users}</div>
+    </div>
+  );
+}
+// src/components/ProductDetail.jsx
+// 재고에 따라 TTL을 달리하는 로직 등 복잡해지는 지점은 생략
+```
+
+리액트에서는 각 컴포넌트가 TTL과 캐시 무효화를 직접 관리하므로 로직이 빠르게 분산되고, 브라우저 저장소를 여러 탭이나 세션에서 동기화하는 것도 어렵습니다. 데이터별 방법과 각종 에러 처리를 상태로 끌어올리면서 번들이 커지고 유지보수가 어려워집니다.
+
+### Next.js 구성 – 서버에서 방법을 지정
+
+```text
+app/
+├── blog/
+│   └── page.tsx         // 정적/ISR: 블로그 목록
+├── dashboard/
+│   └── page.tsx         // 동적: 사용자 대시보드
+└── products/
+    └── [id]/
+        └── page.tsx     // 선택: 상품 상세
+```
+
+```tsx
+// app/blog/page.tsx
+async function getPosts() {
+  const res = await fetch("http://localhost:3000/api/posts", {
+    cache: "force-cache",
+    revalidate: 3600,
+  });
+  if (!res.ok) throw new Error("블로그 글을 불러오지 못했습니다.");
+  return res.json();
+}
+```
+
+```tsx
+// app/dashboard/page.tsx
+async function getDashboardData() {
+  const res = await fetch("http://localhost:3000/api/dashboard", {
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("대시보드 데이터를 불러오지 못했습니다.");
+  return res.json();
+}
+```
+
+```tsx
+// app/products/[id]/page.tsx
+async function getProduct(id: string) {
+  const res = await fetch(`http://localhost:3000/api/products/${id}`, {
+    revalidate: 300,
+  });
+  if (!res.ok) throw new Error("상품을 찾을 수 없습니다.");
+  return res.json();
+}
+```
+
+위처럼 각 `fetch`마다 방법을 달리하면 3-2편에서처럼 병렬로 데이터를 준비하면서도, UI를 그릴 때에는 각각의 최신성 요구를 충족하는 캐시 정책을 사용할 수 있습니다. 클라이언트에는 캐시 관련 코드가 들어가지 않으므로 번들도 가볍고, 경계도 명확합니다.
+
+### 리액트 vs Next.js 비교표
+
+| 구분               | 리액트 (CSR 중심)                        | Next.js (서버/클라이언트 혼합)                                        |
+| :----------------- | :--------------------------------------- | :-------------------------------------------------------------------- |
+| 실행 환경 기본값   | 브라우저에서 캐시/로딩 상태를 직접 관리  | 서버 컴포넌트가 기본, 필요한 곳에만 캐시 방법을 지정                  |
+| 데이터 접근 모델   | 각 페이지가 TTL/로컬 캐시를 구현         | `fetch`의 `cache`/`revalidate` 옵션으로 전략을 선에서 선택            |
+| 번들 관점          | 캐시 로직과 에러 처리까지 번들 후보가 됨 | 데이터 준비 코드가 번들에서 제외되어 번들 크기와 책임이 줄어듦        |
+| 컴포넌트 분리 의미 | UI와 캐시 방법이 뒤섞임                  | UI(클라이언트) vs 렌더링 방법(서버)가 분리되어 경계가 명확            |
+| 설계의 제약        | 자유롭지만 일관된 정책 유지가 어렵다     | `cache`/`revalidate` 옵션을 통해 일관된 정책을 강제하며 합의를 도와줌 |
+
+## 렌더링 방법 선택의 트레이드오프
+
+### 장점
+
+- **데이터별 최신성 제어**: `cache: "no-store"`로 실시간 대시보드, `force-cache`+`revalidate`로 정적 콘텐츠를 한 화면에서 함께 처리할 수 있다.
+- **운영 비용 관리**: 자주 바뀌는 경로만 동적으로 만들고, 나머지는 CDN(정적/ISR)으로 감당하면 서버 부하를 줄일 수 있다.
+- **경계 강조**: 3-2편의 병렬 패칭처럼 데이터를 준비한 뒤 각각의 캐시 정책을 두면, UI와 데이터가 분리되어 복잡도를 낮출 수 있다.
+
+### 단점
+
+- **캐시 방법의 복잡도**: 각각의 `fetch`마다 서로 다른 `cache`/`revalidate` 설정을 붙여야 하므로, 관리 대상이 늘어난다.
+- **서버 응답 지연**: 동적 경로를 지나치게 늘리면 서버 자원이 오래 잡히고, 응답 시간도 늘어난다.
+- **불일치**: 브라우저 캐시와 Next.js 서버 캐시 사이의 차이를 오해하면, 사용자가 예상보다 오래된 데이터를 볼 수 있다. (브라우저 캐시는 HTTP 헤더로 제어되는 클라이언트 측 캐시이고, Next.js 서버 캐시는 서버에서 `fetch`의 `cache` 옵션으로 관리되는 별도의 캐시입니다. 예를 들어 Next.js에서 1시간마다 재검증하도록 설정했어도 브라우저 캐시가 24시간으로 설정되어 있다면 사용자는 하루 종일 오래된 데이터를 볼 수 있습니다)
+
+### 균형 맞추기 팁
+
+- **데이터 변동 주기 기반 분류**: 거의 안 바뀌는 글/카탈로그는 `force-cache`, 중간 정도는 `revalidate`, 실시간은 `no-store`로 나눈다.
+- **필요한 전용 경로만 동적**: 동적 페이지를 무작정 늘리기보다, 개인화가 실제로 필요한 경로만 `no-store`로 구성한다.
+- **3-2편처럼 한 병렬 패칭과 결합**: 여러 데이터를 `Promise.all`로 가져왔으면, 각 결과를 렌더링하면서 적절한 캐시 옵션을 붙여 하나의 화면에서 다양한 최신성을 보장한다.
+
+## 예상 질문
+
+**Q1. 하나의 페이지에서 섹션별로 다른 방법을 쓸 수 있나요?**  
+ 네, `fetch`를 `Promise.all`로 묶어서 병렬 패칭한 뒤, 각 호출에 다른 `cache` 옵션을 붙일 수 있습니다. 예를 들어 대시보드에서는 사용자 정보는 `no-store`, 공지사항은 `revalidate: 3600`으로 설정할 수 있습니다.
+
+**Q2. 브라우저 캐시와 Next.js 서버 캐시가 모두 사용될 때 우선적으로 표현되는 캐시는?**
+Next.js 서버 캐시가 우선적으로 적용됩니다. 서버에서 `fetch`의 `cache` 옵션으로 데이터를 캐시하면 클라이언트 요청 시 서버 캐시된 데이터를 먼저 사용하고, 브라우저는 추가적인 HTTP 캐시 계층으로 작동합니다. 둘 다 캐시되어 있으면 Next.js 서버 캐시가 먼저 적용되어 더 빠른 응답을 제공합니다.
+
+**Q3. `revalidate` 값을 어떻게 정해야 하나요?**  
+ 데이터의 변동 주기와 비즈니스 영향도를 기준으로 정합니다. 예를 들어 블로그는 얼마간은 오래된 정보도 괜찮다면 3600초로 두고, 재고 변동이 잦은 상품은 300초처럼 짧게 잡습니다.
+
+**Q4. 데이터가 많아지면 정적 렌더링이 비효율적인가요?**  
+ 정적 페이지가 너무 많으면 빌드 시간이 늘어나므로, 이를 방지하려면 목록은 정적으로, 상세는 동적이나 ISR로 구분하거나 Route Handler를 통해 집계 API를 구축하는 방식이 있습니다.
+
+**Q5. 캐시 방법을 섞을 때 UI에서 혼란이 생기지 않나요?**
+다양한 전략이 섞여도 스트리밍 레벨에서 Suspense/`loading.tsx` 같은 경계를 두면 각 섹션이 독립적으로 준비됩니다. 데이터 준비는 서버가, 트리거는 `Promise.all`이 담당합니다.
+
+**Q6. `fetch` 옵션 중 `force-cache`를 추가하는 것과 SSG 형식으로 페이지를 미리 생성하는 것은 어떤 차이가 있나요? 같은 건가요?**
+`force-cache`는 특정 fetch 요청의 결과만 캐시하는 옵션인 반면, SSG(Static Site Generation)는 페이지 전체를 빌드 시점에 생성하는 방식입니다. `force-cache`는 ISR과 함께 사용할 수 있어 더 유연하고, SSG는 Pages Router의 `getStaticProps`처럼 페이지 단위로 적용됩니다. 둘 다 빌드 시점에 데이터를 준비한다는 점은 비슷하지만, 적용 범위가 다릅니다.
+
+## 요약
+
+3-2편에서 워터폴을 방지하는 병렬 패칭을 살펴봤다면, 이번 편에서는 그 데이터를 어떤 캐시 정책으로 유지할지 판단하는 단계입니다. 데이터 변동성, 사용자 기대, 운영 비용을 기준으로 정적/ISR/동적 방법을 섞되, 경계를 명확히 하고 `fetch` 옵션을 통해 선언적으로 상태를 기록하세요. 이렇게 하면 여러 데이터가 한 화면에 들어와도 최신성과 일관성을 동시에 제공할 수 있습니다.
+
+## 참조
+
+- Next.js 공식문서
+  - [Static and Dynamic Rendering](https://nextjs.org/learn/dashboard-app/static-and-dynamic-rendering)
+  - [Fetching Data](https://nextjs.org/learn/dashboard-app/fetching-data)
+  - [Revalidation](https://nextjs.org/docs/app/building-your-application/data-fetching/revalidating)
+# 3-3편: 정적 vs 동적 렌더링 – 선택 기준
+
+> 출처: Next.js 공식문서 – [Static and Dynamic Rendering](https://nextjs.org/learn/dashboard-app/static-and-dynamic-rendering)
+
+## 들어가며
+
+3-2편에서 서버 컴포넌트가 여러 데이터 소스를 `Promise.all`로 묶어 워터폴을 풀어낸 흐름을 다뤘습니다. 그때는 “우선 데이터를 병렬로 가져오는 것”에 집중했는데, 이번에는 “가져온 데이터를 어떻게 유지하고 어떤 조건에서 다시 새로 가져올지”를 판단해야 합니다.
+
+한 화면에서 블로그 글 목록은 캐시되고, 사용자 대시보드는 실시간이며, 상품 상세는 재고에 따라 선택적으로 새로 고쳐야 한다면 왜 하나의 렌더링 방법만 고집하면 안 될까요? Next.js의 `fetch`에는 `cache`와 `revalidate`가 있으므로, 각 조각에 맞는 방법을 선언적으로 지정할 수 있습니다. 이 글은 “블로그/대시보드/상품”을 대표 시나리오로 삼아, 3-2편의 병렬 패칭을 유지하면서도 세밀한 렌더링 선택 기준을 짚고 넘어가는 것을 목표로 합니다.
+
+## 정적 vs 동적 렌더링 선택 기준
+
+- **변동 빈도**: 거의 바뀌지 않는 공용 콘텐츠(회사 소개, 글 목록)는 `cache: "force-cache"`에 `revalidate`를 붙여 오래 캐시하고, 실시간 지표는 `cache: "no-store"`로 요청 시마다 업데이트한다.
+- **사용자 기대**: 검색 로봇이나 공유 링크는 빠른 초기 응답이 우선이라면 정적/ISR, 로그인한 사용자는 최신성이 필수이므로 동적 방법을 적용한다.
+- **기술적 제약과 비용**: 동적 렌더링은 매 요청마다 서버 자원을 쓰므로 CDN 캐시 계층이 이미 있는 경로부터 정적/ISR로 커버하고, 실제 시간이 중요한 경로만 `no-store`로 남겨 놓는다.
+- **의존성과 제약**: 3-2편처럼 데이터 간 독립성이 있다면 병렬로 가져오되, 렌더링 단계에서는 각각의 `fetch`에 서로 다른 캐시 옵션을 붙여 최신성 요구를 충족한다. 선후 관계가 있는 흐름은 순차 `await`로 제어한다.
+
+이 기준은 "왜 모든 데이터를 한 전략에 몰아넣으면 안 될까?"라는 질문에 대한 답입니다. 다음 섹션에서는 이 기준을 기반으로 실제 코드 흐름과 지침을 보여드리겠습니다.
+
+## 기능 구현 및 비교
+
+리액트(CSR)에서는 다양한 캐시 방법을 브라우저 단에서 직접 구현해야 했습니다. Next.js에서는 서버 컴포넌트에서 방법을 선언적으로 지정한다에서 차이가 나며, 번들과 경계, 책임 분리가 더 명확해집니다.
+
+### 리액트 단독 구성 – 브라우저에서 캐시 방법 직접 구현
+
+```text
+src/
+├── components/
+│   ├── BlogList.jsx
+│   ├── Dashboard.jsx
+│   └── ProductDetail.jsx
+├── hooks/
+│   └── useCache.js
+├── App.jsx
+└── main.jsx
+```
+
+```jsx
+// src/hooks/useCache.js - 직접 구현한 캐시 훅
+import { useState, useEffect } from "react";
+
+export function useCache(key, fetcher, ttl = 0) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const cached = localStorage.getItem(key);
+    const timestamp = localStorage.getItem(`${key}_timestamp`);
+
+    if (cached && timestamp && Date.now() - Number(timestamp) < ttl) {
+      setData(JSON.parse(cached));
+      setLoading(false);
+      return;
+    }
+
+    fetcher().then((result) => {
+      setData(result);
+      localStorage.setItem(key, JSON.stringify(result));
+      localStorage.setItem(`${key}_timestamp`, String(Date.now()));
+      setLoading(false);
+    });
+  }, [key, ttl]);
+
+  return { data, loading };
+}
+```
+
+```jsx
+// src/components/BlogList.jsx
+import { useCache } from "../hooks/useCache";
+
+export function BlogList() {
+  const { data: posts, loading } = useCache(
+    "blog-posts",
+    () => fetch("/api/posts").then((r) => r.json()),
+    3600000 // 1시간 TTL
+  );
+
+  if (loading) return <div>로딩 중...</div>;
+
+  return (
+    <div>
+      <h1>블로그 글</h1>
+      {posts?.map((post) => (
+        <article key={post.id}>
+          <h2>{post.title}</h2>
+          <p>{post.excerpt}</p>
+        </article>
+      ))}
+    </div>
+  );
+}
+```
+
+```jsx
+// src/components/Dashboard.jsx
+import { useEffect, useState } from "react";
+
+export function Dashboard() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/dashboard")
+      .then((r) => r.json())
+      .then(setData)
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div>로딩 중...</div>;
+
+  return (
+    <div>
+      <h1>대시보드</h1>
+      <div>매출: {data?.revenue}</div>
+      <div>사용자: {data?.users}</div>
+    </div>
+  );
+}
+// src/components/ProductDetail.jsx
+// 재고에 따라 TTL을 달리하는 로직 등 복잡해지는 지점은 생략
+```
+
+리액트에서는 각 컴포넌트가 TTL과 캐시 무효화를 직접 관리하므로 로직이 빠르게 분산되고, 브라우저 저장소를 여러 탭이나 세션에서 동기화하는 것도 어렵습니다. 데이터별 방법과 각종 에러 처리를 상태로 끌어올리면서 번들이 커지고 유지보수가 어려워집니다.
+
+### Next.js 구성 – 서버에서 방법을 지정
+
+```text
+app/
+├── blog/
+│   └── page.tsx         // 정적/ISR: 블로그 목록
+├── dashboard/
+│   └── page.tsx         // 동적: 사용자 대시보드
+└── products/
+    └── [id]/
+        └── page.tsx     // 선택: 상품 상세
+```
+
+```tsx
+// app/blog/page.tsx
+async function getPosts() {
+  const res = await fetch("http://localhost:3000/api/posts", {
+    cache: "force-cache",
+    revalidate: 3600,
+  });
+  if (!res.ok) throw new Error("블로그 글을 불러오지 못했습니다.");
+  return res.json();
+}
+```
+
+```tsx
+// app/dashboard/page.tsx
+async function getDashboardData() {
+  const res = await fetch("http://localhost:3000/api/dashboard", {
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("대시보드 데이터를 불러오지 못했습니다.");
+  return res.json();
+}
+```
+
+```tsx
+// app/products/[id]/page.tsx
+async function getProduct(id: string) {
+  const res = await fetch(`http://localhost:3000/api/products/${id}`, {
+    revalidate: 300,
+  });
+  if (!res.ok) throw new Error("상품을 찾을 수 없습니다.");
+  return res.json();
+}
+```
+
+위처럼 각 `fetch`마다 방법을 달리하면 3-2편에서처럼 병렬로 데이터를 준비하면서도, UI를 그릴 때에는 각각의 최신성 요구를 충족하는 캐시 정책을 사용할 수 있습니다. 클라이언트에는 캐시 관련 코드가 들어가지 않으므로 번들도 가볍고, 경계도 명확합니다.
+
+### 리액트 vs Next.js 비교표
+
+| 구분               | 리액트 (CSR 중심)                        | Next.js (서버/클라이언트 혼합)                                        |
+| :----------------- | :--------------------------------------- | :-------------------------------------------------------------------- |
+| 실행 환경 기본값   | 브라우저에서 캐시/로딩 상태를 직접 관리  | 서버 컴포넌트가 기본, 필요한 곳에만 캐시 방법을 지정                  |
+| 데이터 접근 모델   | 각 페이지가 TTL/로컬 캐시를 구현         | `fetch`의 `cache`/`revalidate` 옵션으로 전략을 선에서 선택            |
+| 번들 관점          | 캐시 로직과 에러 처리까지 번들 후보가 됨 | 데이터 준비 코드가 번들에서 제외되어 번들 크기와 책임이 줄어듦        |
+| 컴포넌트 분리 의미 | UI와 캐시 방법이 뒤섞임                  | UI(클라이언트) vs 렌더링 방법(서버)가 분리되어 경계가 명확            |
+| 설계의 제약        | 자유롭지만 일관된 정책 유지가 어렵다     | `cache`/`revalidate` 옵션을 통해 일관된 정책을 강제하며 합의를 도와줌 |
+
+## 렌더링 방법 선택의 트레이드오프
+
+### 장점
+
+- **데이터별 최신성 제어**: `cache: "no-store"`로 실시간 대시보드, `force-cache`+`revalidate`로 정적 콘텐츠를 한 화면에서 함께 처리할 수 있다.
+- **운영 비용 관리**: 자주 바뀌는 경로만 동적으로 만들고, 나머지는 CDN(정적/ISR)으로 감당하면 서버 부하를 줄일 수 있다.
+- **경계 강조**: 3-2편의 병렬 패칭처럼 데이터를 준비한 뒤 각각의 캐시 정책을 두면, UI와 데이터가 분리되어 복잡도를 낮출 수 있다.
+
+### 단점
+
+- **캐시 방법의 복잡도**: 각각의 `fetch`마다 서로 다른 `cache`/`revalidate` 설정을 붙여야 하므로, 관리 대상이 늘어난다.
+- **서버 응답 지연**: 동적 경로를 지나치게 늘리면 서버 자원이 오래 잡히고, 응답 시간도 늘어난다.
+- **불일치**: 브라우저 캐시와 Next.js 서버 캐시 사이의 차이를 오해하면, 사용자가 예상보다 오래된 데이터를 볼 수 있다. (브라우저 캐시는 HTTP 헤더로 제어되는 클라이언트 측 캐시이고, Next.js 서버 캐시는 서버에서 `fetch`의 `cache` 옵션으로 관리되는 별도의 캐시입니다. 예를 들어 Next.js에서 1시간마다 재검증하도록 설정했어도 브라우저 캐시가 24시간으로 설정되어 있다면 사용자는 하루 종일 오래된 데이터를 볼 수 있습니다)
+
+### 균형 맞추기 팁
+
+- **데이터 변동 주기 기반 분류**: 거의 안 바뀌는 글/카탈로그는 `force-cache`, 중간 정도는 `revalidate`, 실시간은 `no-store`로 나눈다.
+- **필요한 전용 경로만 동적**: 동적 페이지를 무작정 늘리기보다, 개인화가 실제로 필요한 경로만 `no-store`로 구성한다.
+- **3-2편처럼 한 병렬 패칭과 결합**: 여러 데이터를 `Promise.all`로 가져왔으면, 각 결과를 렌더링하면서 적절한 캐시 옵션을 붙여 하나의 화면에서 다양한 최신성을 보장한다.
+
+## 예상 질문
+
+**Q1. 하나의 페이지에서 섹션별로 다른 방법을 쓸 수 있나요?**  
+ 네, `fetch`를 `Promise.all`로 묶어서 병렬 패칭한 뒤, 각 호출에 다른 `cache` 옵션을 붙일 수 있습니다. 예를 들어 대시보드에서는 사용자 정보는 `no-store`, 공지사항은 `revalidate: 3600`으로 설정할 수 있습니다.
+
+**Q2. 브라우저 캐시와 Next.js 서버 캐시가 모두 사용될 때 우선적으로 표현되는 캐시는?**
+Next.js 서버 캐시가 우선적으로 적용됩니다. 서버에서 `fetch`의 `cache` 옵션으로 데이터를 캐시하면 클라이언트 요청 시 서버 캐시된 데이터를 먼저 사용하고, 브라우저는 추가적인 HTTP 캐시 계층으로 작동합니다. 둘 다 캐시되어 있으면 Next.js 서버 캐시가 먼저 적용되어 더 빠른 응답을 제공합니다.
+
+**Q3. `revalidate` 값을 어떻게 정해야 하나요?**  
+ 데이터의 변동 주기와 비즈니스 영향도를 기준으로 정합니다. 예를 들어 블로그는 얼마간은 오래된 정보도 괜찮다면 3600초로 두고, 재고 변동이 잦은 상품은 300초처럼 짧게 잡습니다.
+
+**Q4. 데이터가 많아지면 정적 렌더링이 비효율적인가요?**  
+ 정적 페이지가 너무 많으면 빌드 시간이 늘어나므로, 이를 방지하려면 목록은 정적으로, 상세는 동적이나 ISR로 구분하거나 Route Handler를 통해 집계 API를 구축하는 방식이 있습니다.
+
+**Q5. 캐시 방법을 섞을 때 UI에서 혼란이 생기지 않나요?**
+다양한 전략이 섞여도 스트리밍 레벨에서 Suspense/`loading.tsx` 같은 경계를 두면 각 섹션이 독립적으로 준비됩니다. 데이터 준비는 서버가, 트리거는 `Promise.all`이 담당합니다.
+
+**Q6. `fetch` 옵션 중 `force-cache`를 추가하는 것과 SSG 형식으로 페이지를 미리 생성하는 것은 어떤 차이가 있나요? 같은 건가요?**
+`force-cache`는 특정 fetch 요청의 결과만 캐시하는 옵션인 반면, SSG(Static Site Generation)는 페이지 전체를 빌드 시점에 생성하는 방식입니다. `force-cache`는 ISR과 함께 사용할 수 있어 더 유연하고, SSG는 Pages Router의 `getStaticProps`처럼 페이지 단위로 적용됩니다. 둘 다 빌드 시점에 데이터를 준비한다는 점은 비슷하지만, 적용 범위가 다릅니다.
+
+## 요약
+
+3-2편에서 워터폴을 방지하는 병렬 패칭을 살펴봤다면, 이번 편에서는 그 데이터를 어떤 캐시 정책으로 유지할지 판단하는 단계입니다. 데이터 변동성, 사용자 기대, 운영 비용을 기준으로 정적/ISR/동적 방법을 섞되, 경계를 명확히 하고 `fetch` 옵션을 통해 선언적으로 상태를 기록하세요. 이렇게 하면 여러 데이터가 한 화면에 들어와도 최신성과 일관성을 동시에 제공할 수 있습니다.
+
+## 참조
+
+- Next.js 공식문서
+  - [Static and Dynamic Rendering](https://nextjs.org/learn/dashboard-app/static-and-dynamic-rendering)
+  - [Fetching Data](https://nextjs.org/learn/dashboard-app/fetching-data)
+  - [Revalidation](https://nextjs.org/docs/app/building-your-application/data-fetching/revalidating)

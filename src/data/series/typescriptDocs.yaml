@@ -1,0 +1,21 @@
+title: '공식문서 기반의 타입스크립트 입문기'
+description: '타입스크립트가 실무에서 어떻게 사용되는지 알아보는 시리즈'
+coverImage: '/contents/posts/series/typescriptDocs/images/typescript-logo.svg'
+order:
+  - 1_js-devs-need-types
+  - 2_narrow-union-guards
+  - 3_trust-type-inference
+  - 4_read-ts-errors
+  - 5_structural-typing-interfaces
+  - 6_union-literal-values
+  - 7_function-typing-polymorphism
+  - 8_generics-parameterized-types
+  - 9_generics-constraints-inference
+  - 10_utility-types-code-writing
+  - 11_mapped-types-type-factory
+  - 12_node-express-types
+  - 13_react-common-types
+  - 14_nextjs-common-types
+aliases:
+  - TypeScript Docs
+inSeries: '완료'

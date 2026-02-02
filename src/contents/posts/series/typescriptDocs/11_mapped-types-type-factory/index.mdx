@@ -1,0 +1,206 @@
+---
+title: 'Mapped Types - 타입을 만드는 타입'
+publishedAt: '2025-10-30'
+summary: 'Mapped Types로 타입 순회해 재구성'
+category: '개발'
+series: 'typescriptDocs'
+image: '/contents/posts/series/typescriptDocs/images/11.png'
+---
+
+## 들어가며
+
+사용자 관리 모듈을 일주일 동안 리팩터링하면서 가장 번거러웠던건 "같은 키를 갖되, 특정 필드를 선택적으로 바꾸는" 타입이었습니다. UI에서는 모든 필드를 입력받는 `FullFormPayload`, 서버에서는 일부만 바꾸는 `PatchPayload`, 로그에서는 이름과 상태만 뽑는 `AuditPayload`를 쓰게 되었는데, JS에서는 모두를 함수로 조합하거나 스프레드로 짜깁기하다 보니 `name`이 빠진 로그가 나와도 IDE는 알려주지 않았습니다.
+
+```js
+function makeAudit(payload) {
+  return {
+    name: payload.name,
+    status: payload.status,
+  };
+}
+
+function makePatch(payload) {
+  const result = {};
+  if (payload.name) result.name = payload.name;
+  if (payload.email) result.email = payload.email;
+  if (payload.status) result.status = payload.status;
+  return result;
+}
+```
+
+각 함수마다 다르게 `name`/`email`/`status`를 직접 나열해야 하고, API 응답 필드가 바뀔 때마다 일일이 수정해야 했습니다. 따라서 "이 타입의 키를 하나씩 순회하며 새로운 타입을 짜는" 개념이 있으면 좋겠다는 생각을 했었습니다.
+
+## TypeScript의 제안
+
+TypeScript의 Mapped Types는 기존 타입의 키 집합을 차례대로 순회하며 새로운 타입을 자동으로 짜주는 문법입니다. “어떤 키를 어떤 타입으로 매핑할까?”라는 질문에 대해 선언적으로 답할 수 있게 해 줍니다.
+
+### Mapped Types는 무엇인가?
+
+일반적인 객체 타입 선언은 “이 키가 이 타입이다”를 한 줄씩 적습니다. Mapped Types는 그 키들을 `for` 루프처럼 자동 순회하면서 “모든 키에 대해 어떤 타입을 만들지”를 매핑하는 방식입니다. 다시 말해 “타입을 만드는 타입”이라는 이름처럼, 기존 타입을 입력으로 받아 새로운 타입을 짜주는 일종의 반복자 역할을 합니다.
+
+### 키 순회로 새로운 타입 생성
+
+`in keyof` 구문으로 타입의 모든 키를 반복하며 새로운 타입을 만들 수 있습니다.
+
+```ts
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  status: "active" | "inactive";
+}
+
+// 감사 로그용: 특정 필드만 선택
+type AuditFields = "name" | "status";
+type AuditPayload = { [K in AuditFields]: User[K] }; // { name: string; status: "active" | "inactive" }
+
+// 부분 업데이트용: 모든 필드를 옵셔널로
+type PatchPayload = { [K in keyof User]?: User[K] }; // { id?: string; name?: string; email?: string; status?: "active" | "inactive" }
+```
+
+`{ [K in AuditFields]: User[K] }`는 `AuditFields`("name" | "status")에 포함된 각 키에 대해 `User[K]` 타입을 매핑합니다. 결과적으로 `AuditPayload`는 `{ name: string; status: "active" | "inactive" }` 타입이 됩니다. `keyof User`는 User의 모든 키("id" | "name" | "email" | "status")를 의미하므로 `PatchPayload`는 User의 모든 필드를 옵셔널로 만든 타입이 됩니다.
+
+## 심층 분석
+
+### 1) 키 이름 변환과 필터링
+
+Mapped Types에서 `as` 키워드를 사용하면 키 이름을 변형하거나 필터링할 수 있습니다.
+
+```ts
+type FormValues<T> = { [K in keyof T as `form_${string & K}`]: T[K] };
+type UserFormValues = FormValues<User>;
+```
+
+`K in keyof T as \`form*${string & K}\`는 각 키를 `form*`접두사가 붙은 새로운 이름으로 변환합니다.`string & K`는 K가 string 타입임을 보장합니다. 이를 통해 User 인터페이스의 모든 필드가 `form_id`, `form_name` 등의 폼 필드 이름으로 변환됩니다.
+
+### 2) 런타임 값에서 타입 추출
+
+배열이나 객체의 런타임 값을 타입으로 변환하여 Mapped Types에 활용할 수 있습니다.
+
+```ts
+const auditFields = ["name", "status"] as const;
+type AuditField = (typeof auditFields)[number]; // "name" | "status"
+type AuditPayload = { [K in AuditField]: User[K] };
+
+// 실제 사용
+const auditData: AuditPayload = {
+  name: "김개발",
+  status: "active",
+};
+```
+
+`as const`로 선언된 배열에서 `(typeof auditFields)[number]`는 각 요소의 리터럴 타입을 추출합니다. 이를 Mapped Types에 적용하면 런타임 값과 타입 정의를 일관되게 유지할 수 있습니다.
+
+### 3) 조건부 필터링과 변환
+
+Mapped Types에 조건부 타입을 적용하면 특정 조건을 만족하는 키만 포함하거나 변환할 수 있습니다.
+
+```ts
+// 옵셔널 필드만 추출
+type OptionalKeys<T> = { [K in keyof T as T[K] extends undefined ? K : never]: T[K] };
+
+// 필수 필드만 추출
+type RequiredKeys<T> = { [K in keyof T as undefined extends T[K] ? never : K]: T[K] };
+
+// 문자열 필드만 추출
+type StringKeys<T> = { [K in keyof T as T[K] extends string ? K : never]: string };
+```
+
+조건부 타입 `T[K] extends undefined ? K : never`는 값 타입이 `undefined`를 포함하면 키를 포함시키고, 그렇지 않으면 `never`로 제외합니다. 이를 통해 타입의 특정 부분집합만 추출할 수 있습니다.
+
+### 4) 선언적 타입 변환
+
+Mapped Types를 사용하면 기존 타입을 선언적으로 변환하여 재사용 가능한 유틸리티 타입을 만들 수 있습니다.
+
+```ts
+type Maybe<T> = T | null;
+type NullableUser = { [K in keyof User]: Maybe<User[K]> };
+
+// API 응답용 변환
+type ApiUser = { [K in keyof User as K extends "id" ? never : K]: User[K] };
+
+// 런타임에서 사용
+const apiResponse: ApiUser = {
+  name: "김개발",
+  email: "kim@example.com",
+  status: "active",
+  // id 필드는 제외됨
+};
+```
+
+`K extends "id" ? never : K` 조건으로 id 필드를 제외한 타입을 만듭니다. Mapped Types는 기존 타입을 기반으로 선언적으로 새로운 타입을 생성할 수 있게 해줍니다.
+
+## 실전 패턴 (In React)
+
+### 폼 상태 관리의 타입 안전성 강화
+
+Mapped Types를 활용해 React 폼의 상태 관리를 타입 안전하게 구현할 수 있습니다.
+
+```tsx
+// 1) 타입 정의: 폼 상태 관리에 필요한 타입들
+type UserField = keyof User; // User의 모든 키: "id" | "name" | "email" | "status"
+
+// Mapped Types: 각 필드에 빈 문자열("")을 허용 (초기값이 없을 때 사용)
+type FormState<T extends object> = { [K in keyof T]: T[K] | "" };
+// FormState<User> 결과: { id: string | ""; name: string | ""; email: string | ""; status: ("active"|"inactive") | "" }
+
+function useFormState(initial: User) {
+  // 2) 폼 상태 초기화: initial User 객체를 FormState<User> 타입으로 변환
+  // initial이 User 타입이므로 각 필드에 빈 문자열이 추가된 상태로 시작
+  const [form, setForm] = useState<FormState<User>>(initial);
+
+  // 3) 필드 업데이트 함수: 타입 안전한 단일 필드 업데이트
+  // K는 UserField("id"|"name"|"email"|"status")로 제한됨
+  function update<K extends UserField>(key: K, value: string) {
+    setForm((prev) => ({ ...prev, [key]: value })); // 해당 key의 값만 업데이트
+  }
+
+  // 4) 폼 제출 함수: FormState를 PatchPayload로 변환
+  function handleSubmit() {
+    const payload: PatchPayload = {}; // 빈 객체로 시작 (모든 필드가 옵셔널)
+
+    // 폼의 모든 키를 순회하면서 빈 값이 아닌 것만 payload에 추가
+    (Object.keys(form) as UserField[]).forEach((key) => {
+      const value = form[key]; // form[key]는 T[K] | "" 타입
+      if (value !== "") {
+        // 빈 문자열이 아닌 경우에만
+        (payload as any)[key] = value; // PatchPayload에 추가 (옵셔널 필드이므로 안전)
+      }
+    });
+
+    // 변환된 payload를 API에 전송
+    api.updateUser(payload); // PatchPayload 타입 보장
+  }
+
+  // 5) 외부에 노출할 인터페이스 반환
+  return { form, update, handleSubmit };
+}
+```
+
+`FormState<T>`는 각 필드에 빈 문자열(`""`)을 허용하는 Mapped Type입니다. 이를 통해 React 폼에서 초기값이 없을 때 빈 문자열을 사용할 수 있습니다. `update` 함수는 `keyof User`를 제약으로 받아 타입 안전한 필드 업데이트를 보장합니다.
+
+## 함정
+
+1. Mapped Types가 너무 복잡해지면 IDE가 자동 완성해도 이해가 어려워집니다. 간단할 때는 `Pick`, `Omit`으로 가볍게 처리해도 무방합니다.
+2. `as never`로 키를 제거할 때 `K`가 `never`가 되지 않도록 타입을 분리해 두세요. 예상치 못한 `never` 때문에 전체 타입이 빈 객체가 될 수 있습니다.
+
+## 예상 질문
+
+**Q1. Mapped Types를 너무 많이 쓰면 타입 선언이 산으로 갈 것 같은데요?**  
+ A: 핵심 타입(예: `User`)을 한 번 선언하고, 그 위에서 다양한 변환 타입을 만들면 오히려 중복이 줄고 구조가 명확해집니다. 중요한 건 각 타입의 의도를 주석/설명으로 남기는 것입니다.
+
+**Q2. `keyof User`로 반복하다 보면 `string` 타입이라도 들어오면 어떻게 하나요?**  
+ A: `as const`로 literal 타입을 강제하거나, `keyof User`를 `UserField`처럼 `keyof typeof SOME_CONST`로 감싸세요. 그럼 임의의 문자열이 타입을 흐트러뜨릴 여지가 줄어듭니다.
+
+**Q3. `as` 절이 많아지면 불투명해질 텐데, 의도는 어떻게 설명하죠?**  
+ A: 타입별칭이나 주석으로 “왜 이렇게 매핑하는지” 설명하고, 경우에 따라 `type`을 나눠서 작은 단위로 만드는 게 좋습니다.
+
+## 요약
+
+Mapped Types는 “늑장으로 manual하게 필드를 하나하나 중복 선언”하던 JS DTO 문제를 한 번에 해결합니다. `in keyof` 반복, `as` 이름 변경, 조건부 타입 결합을 통해 새로운 타입을 기존 타입 위에서 선언적으로 만들어 쓰고, React 상태나 API DTO에 그대로 연결하면 타입 흐름이 더 명확해집니다. 다음 편에서는 이 패턴을 기반으로 커스텀 `Utility Type`을 직접 만들어 봅니다.
+
+## 참조
+
+- TypeScript 공식문서
+  - [Mapped Types](https://www.typescriptlang.org/docs/handbook/2/mapped-types.html)
+  - [Utility Types](https://www.typescriptlang.org/docs/handbook/utility-types.html)

@@ -1,0 +1,235 @@
+---
+title: '제네릭(Generics) 1부 - "타입의 파라미터화'
+publishedAt: '2025-10-27'
+summary: '제네릭으로 fetch 유틸 재사용 확보'
+category: '개발'
+series: 'typescriptDocs'
+image: '/contents/posts/series/typescriptDocs/images/8.png'
+---
+
+## 들어가며
+
+가상의 회사 환경을 상상해보겠습니다. 이 회사에는 `fetchJson`이라는 공용 유틸 함수가 있는데, 이 함수는 API마다 반환하는 데이터가 제각각입니다. 데이터를 사용하는 쪽에서는 `const payload = await fetchJson("/todos"); const todos = payload.items;`처럼 `any` 타입으로 처리하고 난 뒤에야 런타임에서 `items` 속성이 없다는 사실을 깨닫는 일이 반복됩니다. `fetchJson("/users")`는 사용자 배열을 반환하고, `/me`는 단지 `{ name }` 객체만 반환하는 식입니다.
+
+```js
+async function fetchJson(url) {
+  const res = await fetch(url);
+  return res.json();
+}
+
+const profile = await fetchJson("/me");
+console.log(profile.name); // undefined면 런타임 에러
+```
+
+자바스크립트에서는 타입 계약이 느슨하기 때문에 "잘 되겠지"라는 생각으로 그냥 사용하게 됩니다. 하지만 프로덕션에서 API 스펙이 변경되면 고객이 에러 로그를 보고하기 전까지 아무도 문제를 알지 못하는 상황이 벌어집니다. TypeScript의 제네릭을 사용하면 "이 함수는 어떤 타입을 입력받고 어떤 타입을 반환하는지"를 컴파일 타임에 명확한 계약으로 정의할 수 있습니다.
+
+## TypeScript의 제안
+
+TypeScript는 제네릭을 사용해 함수가 타입을 파라미터로 받아들이도록 하여 컴파일 타임에 타입 안전성을 보장합니다. API 호출 함수의 타입 안전성을 강화하는 방법을 제안합니다.
+
+### 타입 파라미터로 API 응답 타입 지정
+
+프론트엔드에서 `fetch`로 API를 호출할 때, 각 엔드포인트가 다른 결과를 반환한다면 타입을 단 한 곳으로 선언해서 재사용하는 것이 어렵습니다. 이때 제네릭 `T`를 받아들인 `fetchJson` 함수를 만들면 각 호출 지점에서 API 스펙을 전달하면서 타입 안전성을 확보할 수 있습니다.
+
+```ts
+async function fetchJson<T>(url: string): Promise<T> {
+  const res = await fetch(url);
+  return res.json() as T; // 런타임에서는 여전히 any지만 컴파일 타임에는 T로 다뤄짐
+}
+
+const profile = await fetchJson<{ name: string; id: number }>("/me");
+console.log(profile.name); // string 타입으로 안전하게 접근
+console.log(profile.id); // number 타입으로 안전하게 접근
+```
+
+호출할 때 `<{ name: string; id: number }>`처럼 타입을 명시하면, 해당 엔드포인트의 응답 타입이 제네릭 T에 전달되어 컴파일러가 자동으로 안전한 속성 접근을 허용합니다. 제네릭의 기본 원리는 다음 섹션에서 자세히 다룹니다. 
+
+## 심층 분석
+
+### 1) 제네릭의 기본: 타입 파라미터로 재사용성 확보
+
+제네릭은 함수나 클래스가 타입을 파라미터로 받아들이도록 하는 기능입니다.
+
+```ts
+function identity<T>(value: T): T {
+  return value;
+}
+
+const text = identity("hello"); // T는 string으로 추론됨
+const count = identity(42); // T는 number로 추론됨
+const user = identity({ id: 1 }); // T는 { id: number }로 추론됨
+```
+
+`<T>`는 타입 자리표시자로, 함수를 호출할 때 실제 타입으로 대체됩니다. TypeScript는 각 호출에서 `T`를 구체적인 타입으로 추론하여 입력 타입과 출력 타입이 일치하도록 보장합니다.
+
+### 2) 자동 추론 vs 명시적 지정
+
+TypeScript는 제네릭 타입을 자동으로 추론하지만, 필요시 명시적으로 지정할 수도 있습니다.
+
+```ts
+interface User {
+  name: string;
+  id: number;
+}
+
+// 자동 추론
+const user1 = identity({ name: "김개발", id: 1 }); // User 타입으로 추론
+
+// 명시적 지정
+const user2 = identity<User>({ name: "김개발", id: 1 }); // 명시적으로 User 타입 지정
+
+// API 호출에서 명시적 지정이 유용
+const me = await fetchJson<User>("/me"); // 반환 타입을 명시적으로 지정
+```
+
+대부분의 경우 TypeScript가 자동으로 타입을 추론하지만, API 호출처럼 반환 타입이 불명확한 경우 `<User>`처럼 명시적으로 지정하면 타입 안전성을 확보할 수 있습니다.
+
+### 3) 제약 조건으로 타입 안전성 강화
+
+`extends` 키워드는 제네릭에 “이런 속성을 포함해야 한다”는 경계선을 그릴 때 쓰입니다. 예를 들면 다음과 같습니다.
+
+```ts
+function withId<T extends { id: string }>(value: T) {
+  console.log(value.id); // id가 보장되어 있으므로 안전
+  return value;
+}
+```
+
+이렇게 선언하면 `value.id`에 접근할 때 컴파일러가 “id가 있다”라고 확신하므로, 내부 로직에서 안전하게 사용할 수 있습니다. 세부 제약과 조건부 타입은 다음 편(3-3편)에서 더 깊이 다루겠습니다.
+
+### 4) 유틸리티 타입과의 시너지 효과
+
+제네릭과 TypeScript의 유틸리티 타입을 결합하면 강력한 타입 재사용이 가능합니다.
+
+```ts
+// 함수의 반환 타입 추출
+async function fetchJson<T>(url: string): Promise<T> {
+  const res = await fetch(url);
+  return res.json();
+}
+
+type User = { id: number; name: string };
+
+// 1) 함수의 반환 타입 추출
+// typeof fetchJson<User>는 함수 타입 fetchJson<User>을 의미
+// ReturnType<...>는 이 함수의 반환 타입인 Promise<User>를 추출
+type UserResponse = ReturnType<typeof fetchJson<User>>; // Promise<User>
+
+// 2) 함수의 파라미터 타입 추출
+// Parameters<typeof fetchJson>은 [url: string] 튜플 타입
+// [0] 인덱스로 첫 번째 파라미터 타입인 string을 추출
+type FetchParams = Parameters<typeof fetchJson>[0]; // string (url 파라미터)
+
+// 3) 제네릭 함수의 파라미터 타입 추출
+function createApi<T>() {
+  return {
+    get: (id: string) => fetchJson<T>(`/api/${id}`), // 단일 항목 조회
+    list: () => fetchJson<T[]>(`/api`), // 목록 조회 (배열)
+  };
+}
+
+// 단계별 분석:
+// typeof createApi<User> → createApi<User> 함수 타입
+// ReturnType<...> → { get: (id: string) => Promise<User>, list: () => Promise<User[]> }
+// ["get"] → (id: string) => Promise<User> 함수 타입
+// Parameters<...> → [id: string] 튜플 타입
+// [0] → 첫 번째 파라미터 string 타입
+type ApiParams = Parameters<ReturnType<typeof createApi<User>>["get"]>[0]; // string
+```
+
+`ReturnType`과 `Parameters` 같은 유틸리티 타입을 사용하면 기존 함수의 타입 정보를 추출하여 재사용할 수 있습니다. 이를 통해 타입 정의의 중복을 줄이고 일관성을 유지할 수 있습니다. 특히 복잡한 제네릭 함수의 경우 단계별로 타입을 추출하면 디버깅과 유지보수가 쉬워집니다.
+
+## 실전 패턴 (In React)
+
+### 데이터 fetching 훅의 제네릭 활용
+
+React에서 비동기 데이터를 다루는 커스텀 훅에 제네릭을 적용하는 방법을 보여줍니다.
+
+```tsx
+// 1) API 응답 상태를 표현하는 제네릭 타입
+// T는 API에서 반환할 데이터의 타입을 나타냄
+type UseDataResult<T> = {
+  data: T | null; // API 데이터 (성공 시 T 타입, 초기/에러 시 null)
+  loading: boolean; // 로딩 상태
+  error: Error | null; // 에러 객체 (없으면 null)
+};
+
+// 2) 제네릭 커스텀 훅: URL에 따라 다른 타입의 데이터를 fetch
+// T는 이 훅을 사용할 때 지정할 데이터 타입
+function useData<T>(url: string): UseDataResult<T> {
+  // 제네릭 타입 T를 사용해 state 타입을 지정
+  // 초기 상태: 로딩 중, 데이터와 에러는 없음
+  const [state, setState] = useState<UseDataResult<T>>({
+    data: null, // 아직 데이터 없음
+    loading: true, // API 호출 시작하므로 로딩 중
+    error: null, // 에러 없음
+  });
+
+  // URL이 변경될 때마다 API 호출
+  useEffect(() => {
+    // fetchJson<T>에 T 타입을 전달하여 해당 타입의 데이터를 기대
+    fetchJson<T>(url)
+      .then((data: T) => {
+        // 성공: 데이터 저장, 로딩 종료, 에러 초기화
+        setState({ data, loading: false, error: null });
+      })
+      .catch((error: Error) => {
+        // 실패: 데이터 초기화, 로딩 종료, 에러 저장
+        setState({ data: null, loading: false, error });
+      });
+  }, [url]); // url이 바뀔 때마다 재실행
+
+  // 현재 상태 반환 (호출하는 컴포넌트에서 사용)
+  return state;
+}
+
+// 3) 실제 컴포넌트에서 사용 예시
+function ProductList() {
+  // useData<Product[]>로 호출: Product 배열 타입의 데이터를 기대
+  // TypeScript는 data가 Product[] | null임을 추론
+  const { data, loading, error } = useData<Product[]>("/products");
+
+  // 로딩 중이면 스피너 표시
+  if (loading) {
+    return <Spinner />;
+  }
+
+  // 에러가 있거나 데이터가 없으면 에러 패널 표시
+  if (error || !data) {
+    return <ErrorPanel error={error} />;
+  }
+
+  // 데이터가 있으면 (Product[] 타입) 목록 렌더링
+  // TypeScript는 data가 Product[]임을 보장
+  return <List items={data} />;
+}
+```
+
+`useData<T>`의 제네릭 타입 `T`는 `fetchJson<T>` 호출을 통해 API 응답 타입을 지정합니다. `useData<Product[]>`처럼 호출하면 `data`가 `Product[]` 타입으로 추론되어 컴포넌트에서 타입 안전하게 사용할 수 있습니다. 각 단계에서 TypeScript는 제네릭을 통해 정확한 타입 추론을 수행합니다.
+
+## 함정
+
+1. 제네릭을 과도하게 쓰면 호출부가 `<Type>`을 붙여야 해서 번거롭습니다. 대부분은 추론으로 충분하므로, 명시적 타입 인자는 꼭 필요한 경우에만 쓰세요.
+2. `T = any` 처럼 기본값을 둔 제네릭은 타입 안전성을 낮춥니다. 가능한 `unknown`이나 구체적인 타입을 기본값으로 하고, `any`의 사용은 피하세요.
+3. 제네릭 안에서 `as` 단언을 남발하면 컴파일러가 타입을 추론하지 못합니다. “이 타입은 이런 모양을 가진다”는 계약을 지킬 때는 명시적 단언이 아니라 `extends`/조건부 타입으로 해결하세요.
+
+## 예상 질문
+
+**Q1. 제네릭을 처음 써보면 복잡한가요?**  
+초기에는 문법이 낯설어도, `function foo<T>(value: T)`처럼 쓰는 방식은 점점 “값을 받을 자리에 타입 자리표시자”라고 생각하면 편합니다. 추론되는 상황만 쓰면 실제 `<...>`을 붙이지 않아도 되고, IDE가 제네릭 타입을 보여주므로 손쉽게 익힐 수 있습니다.
+
+**Q2. `unknown`을 쓰는 대신 제네릭을 쓰면 어떤 차이가 있나요?**  
+`unknown`은 “나는 아무 것도 모른다”를 표현하지만, 제네릭은 “사용자가 이 타입을 결정한다”는 의도입니다. 제네릭은 호출 시점에 정확한 타입을 밟아서, 그 아래에서 타입을 다시 좁힐 때 도움이 됩니다.
+
+**Q3. 제네릭을 `extends` 없이 쓰면 위험한가요?**  
+`extends`는 조건을 걸기 위한 도구이지만, 반드시 써야 하는 건 아닙니다. 그러나 API 요청처럼 특정 속성이 필요한 경우 `extends`를 붙이면 구현부와 호출부 모두 안전해지고, 런타임에서 놓치는 오류를 줄일 수 있습니다.
+
+## 요약
+
+제네릭은 “타입도 파라미터가 될 수 있다”는 핵심 아이디어입니다. JS에서는 모든 API 응답을 `any`로 처리했지만, TypeScript는 제네릭으로 호출자가 타입을 지정하면 그 타입대로 응답을 바라봅니다. React 훅에서도 `useData<T>`처럼 제네릭을 붙이면 `data` 하나를 찍어도 타입 안전성이 유지되므로, 다음 이야기는 제네릭 제약(`extends`, `keyof`, `in`)을 더 깊이 파고드는 방향으로 가보겠습니다.
+
+## 참조
+
+- TypeScript 공식문서
+  - [Generics](https://www.typescriptlang.org/docs/handbook/2/generics.html)
+  - [Generics: Type Parameters](https://www.typescriptlang.org/docs/handbook/2/generics.html#generics)

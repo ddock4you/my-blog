@@ -1,0 +1,294 @@
+---
+title: '캐노니컬 – 중복 방지'
+publishedAt: '2025-10-03'
+summary: 'canonical로 중복 URL 정책 정리'
+category: '개발'
+series: 'nextjsDocs'
+image: '/contents/posts/series/nextjsDocs/images/19.png'
+---
+
+## 들어가며
+
+블로그에서 같은 글이 여러 URL로 접근되는 상황을 흔히 봅니다. `/blog/nextjs-guide`로 존재하는 글이 `/tags/nextjs`나 `/search?q=nextjs`에서도 나타나는 식입니다. 이러면 검색 엔진이 혼란스러워져 PageRank가 분산되고 검색 순위가 떨어집니다.
+
+캐노니컬은 "이 콘텐츠의 공식 URL은 여기다"라고 검색 엔진에 선언하는 메타 태그입니다. 같은 콘텐츠가 여러 URL로 존재할 때 원본을 지정해서 검색·소셜 공유의 일관성을 유지합니다.
+
+이번 편에서는 블로그 글 상세 시나리오를 기준으로 CSR의 캐노니컬 처리 한계를 보여드린 뒤 Next.js로 해결하는 패턴을 살펴보겠습니다.
+
+## 캐노니컬 정책
+
+캐노니컬은 중복 콘텐츠에서 원본 URL을 지정하는 메타 태그입니다. 검색 엔진이 여러 URL 중 어느 것을 색인·공유의 기준으로 삼을지 결정하는 데 사용됩니다. Next.js에서는 Metadata API의 `canonical`과 `alternates` 속성으로 이를 선언합니다.
+
+### 캐노니컬의 판단 기준
+
+어떤 URL을 캐노니컬로 지정할지는 콘텐츠의 고유성과 검색 엔진 신뢰 사이 균형을 고려합니다. 일반적으로:
+
+- **원본 콘텐츠**: `/blog/post-slug`처럼 가장 직접적이고 의미 있는 URL
+- **파생 페이지**: `/tags/nextjs`나 `/search?q=nextjs` 같은 필터/검색 결과 페이지는 자체 캐노니컬을 가지되, 개별 콘텐츠에는 영향을 주지 않음
+
+잘못 지정하면 검색 순위가 떨어지고, 지정하지 않으면 검색 엔진이 임의로 선택해 예측 불가능해집니다.
+
+### Metadata API의 캐노니컬 자동화
+
+Metadata API는 다음과 같은 속성들로 캐노니컬을 타입 안전하게 선언합니다:
+
+- `canonical`: 현재 페이지의 공식 URL 지정
+- `alternates`: 다국어·형식별 버전 연결
+- `metadataBase`: 절대 URL 자동 생성
+
+이를 통해 정적 메타에서는 고정 URL을, 동적 메타에서는 `generateMetadata`에서 계산된 URL을 자동으로 제공합니다.
+
+## 기능 구현 및 비교
+
+이번 섹션에서는 "블로그 글 상세 + 태그/검색 페이지" 시나리오를 기준으로, CSR에서 캐노니컬을 어떻게 처리하는 한계를 보여드린 뒤 Next.js로 동일한 목표를 구현해보겠습니다.
+
+### 리액트 단독 – 클라이언트 렌더링 + 수동 캐노니컬 관리
+
+CSR에서는 모든 캐노니컬을 클라이언트에서 관리합니다. 각 페이지마다 수동으로 메타 태그를 설정합니다.
+
+```text
+src/
+├── components/
+│   ├── Head.jsx                     // 메타 관리 컴포넌트
+│   └── BlogPost.jsx                 // 글 상세 컴포넌트
+├── pages/
+│   ├── blog/
+│   │   ├── [slug].jsx               // 글 상세 페이지
+│   │   └── tags/[tag].jsx           // 태그 페이지
+│   └── _document.jsx                // HTML 문서 템플릿
+└── utils/
+    └── canonical.js                 // 캐노니컬 생성 유틸리티
+```
+
+블로그 글 상세는 클라이언트에서 데이터를 가져온 후 캐노니컬을 동적 설정합니다:
+
+```jsx
+// src/components/Head.jsx
+import { useEffect } from "react";
+
+export function Head({ canonical, title }) {
+  useEffect(() => {
+    const canonicalLink = document.querySelector('link[rel="canonical"]');
+    if (canonicalLink) {
+      canonicalLink.href = canonical;
+    } else {
+      const link = document.createElement("link");
+      link.rel = "canonical";
+      link.href = canonical;
+      document.head.appendChild(link);
+    }
+    document.title = title;
+  }, [canonical, title]);
+
+  return null;
+}
+```
+
+블로그 글 상세 페이지에서 사용합니다:
+
+```jsx
+// src/pages/blog/[slug].jsx
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import { Head } from "../../components/Head";
+
+export function BlogPost() {
+  const router = useRouter();
+  const { slug } = router.query;
+  const [post, setPost] = useState(null);
+
+  useEffect(() => {
+    fetch(`/api/posts/${slug}`)
+      .then((res) => res.json())
+      .then(setPost);
+  }, [slug]);
+
+  if (!post) return <div>로딩 중...</div>;
+
+  const canonicalUrl = `https://myblog.com/blog/${post.slug}`;
+
+  return (
+    <>
+      <Head canonical={canonicalUrl} title={post.title} />
+      <div>
+        <h1>{post.title}</h1>
+        <p>{post.content}</p>
+      </div>
+    </>
+  );
+}
+```
+
+CSR의 기본 패턴입니다. `useEffect`로 캐노니컬 태그를 동적 업데이트하고, 각 페이지에서 `Head` 컴포넌트를 호출합니다.
+
+### 리액트 방식의 한계
+
+CSR에서는 캐노니컬 일관성이 부족합니다. 클라이언트에서 캐노니컬을 변경해도 검색 엔진 크롤러가 초기 HTML을 보지 못하면 올바른 캐노니컬이 인식되지 않습니다. 캐시 간섭도 발생해 소셜 공유 시 오래된 URL이 표시될 수 있습니다.
+
+### Next.js 구성 – 서버 측 캐노니컬 제어
+
+Next.js에서는 `app/` 구조와 Metadata API로 캐노니컬을 서버에서 제어합니다. 글 상세는 `generateMetadata`로 동적 캐노니컬을, 태그 페이지는 정적 캐노니컬을 설정합니다.
+
+```text
+app/
+├── blog/
+│   ├── [slug]/
+│   │   └── page.tsx              // 글 상세: 동적 캐노니컬 + 메타
+│   └── tags/[tag]/
+│       └── page.tsx              // 태그: 정적 캐노니컬 + 메타
+└── layout.tsx                    // metadataBase 설정
+```
+
+블로그 글 상세는 `generateMetadata`로 동적 캐노니컬을 생성합니다:
+
+```tsx
+// app/blog/[slug]/page.tsx
+import { Metadata } from "next";
+import { getPostBySlug } from "../../lib/posts";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { slug: string };
+}): Promise<Metadata> {
+  const post = await getPostBySlug(params.slug);
+
+  if (!post) {
+    return {
+      title: "글을 찾을 수 없습니다",
+    };
+  }
+
+  return {
+    title: post.title,
+    description: post.excerpt,
+    canonical: `https://myblog.com/blog/${post.slug}`,
+  };
+}
+
+export default async function BlogPost({ params }: { params: { slug: string } }) {
+  const post = await getPostBySlug(params.slug);
+
+  if (!post) {
+    return <div>글을 찾을 수 없습니다</div>;
+  }
+
+  return (
+    <div>
+      <h1>{post.title}</h1>
+      <p>{post.content}</p>
+    </div>
+  );
+}
+```
+
+태그 페이지는 정적 메타로 캐노니컬을 설정합니다:
+
+```tsx
+// app/blog/tags/[tag]/page.tsx
+import { Metadata } from "next";
+import { getPostsByTag } from "../../../lib/posts";
+
+export const metadata: Metadata = {
+  title: "태그별 글 목록",
+  description: "태그별로 분류된 글들을 확인하세요",
+};
+
+export default async function TagPage({ params }: { params: { tag: string } }) {
+  const posts = await getPostsByTag(params.tag);
+
+  return (
+    <div>
+      <h2>{params.tag} 태그 글들</h2>
+      {posts.map((post) => (
+        <div key={post.id}>
+          <h3>{post.title}</h3>
+          <p>{post.excerpt}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+서버에서 캐노니컬을 제어하고 정적·동적 패턴으로 검색 엔진 신뢰를 유지합니다.
+
+### 리액트 vs Next.js 비교표
+
+| 구분               | 리액트 (CSR + 수동 캐노니컬 관리)          | Next.js (서버 측 캐노니컬 제어 + Metadata API) |
+| :----------------- | :----------------------------------------- | :--------------------------------------------- |
+| 실행 환경 기본값   | 브라우저에서 useEffect로 캐노니컬 업데이트 | 서버에서 Metadata 객체 생성                    |
+| 데이터 접근 모델   | 클라이언트 fetch 후 캐노니컬 수동 설정     | generateMetadata에서 직접 데이터 조회          |
+| 번들 관점          | 캐노니컬 로직이 클라이언트 번들에 포함     | Metadata API는 서버 실행, 번들 영향 최소       |
+| 컴포넌트 분리 의미 | 캐노니컬 로직이 비즈니스 로직과 결합       | 정적/동적 캐노니컬로 관심사 분리               |
+| 설계의 제약        | 캐노니컬 품질이 개발자 역량에 달려         | Metadata API로 타입 안전한 캐노니컬 자동화     |
+
+## 캐노니컬의 트레이드오프
+
+### 장점
+
+- **중복 콘텐츠 방지**: 검색 엔진에 콘텐츠의 공식 URL을 명확히 전달하여 PageRank 집중과 검색 순위 향상
+- **공유 일관성**: 소셜 공유 시 동일한 미리보기 표시로 브랜딩 강화
+- **다국어 지원**: alternates로 각 언어 버전을 연결하여 국제 검색 엔진 최적화
+
+### 단점
+
+- **복잡한 관계 설정**: 원본과 파생 페이지 간 캐노니컬 관계를 정확히 정의하기 어려움
+- **빌드 시간 증가**: 동적 캐노니컬을 과도하게 사용하면 메타데이터 생성 부담 증가
+- **절대 URL 요구**: 캐노니컬 태그는 항상 절대 URL이어야 하므로 URL 계산 복잡성
+
+### 균형 맞추기 팁
+
+콘텐츠가 여러 URL로 접근될 수 있는 경우에만 캐노니컬을 적용하세요. 원본과 파생 페이지의 관계를 명확히 정의하고, 다국어 사이트에서는 alternates를 반드시 포함하세요. `metadataBase`를 활용하여 절대 URL 계산을 간소화하세요.
+
+## Next.js 고유 기능/운영 지침
+
+### 캐노니컬 선택 패턴
+
+- **원본 콘텐츠**: 글 상세·제품 상세 페이지에 고유 캐노니컬 지정
+- **파생 페이지**: 태그·검색·카테고리 페이지는 자체 캐노니컬 유지
+- **alternates**: 다국어 버전 연결에 사용
+
+### Metadata API 구성
+
+| 메타 유형    | 용도                    | 예시                                          |
+| :----------- | :---------------------- | :-------------------------------------------- |
+| canonical    | 현재 페이지의 공식 URL  | `canonical: "https://myblog.com/blog/post"`   |
+| alternates   | 동일 콘텐츠의 다른 버전 | `alternates: { languages: { en: "..." } }`    |
+| metadataBase | 절대 URL의 기본 경로    | `metadataBase: new URL("https://myblog.com")` |
+
+### 예상 질문
+
+**Q1. CSR에서 캐노니컬을 어떻게 동적 변경하나요?**
+
+클라이언트에서 `document.querySelector`로 캐노니컬 링크를 찾아 `href`를 업데이트할 수 있지만, 검색 엔진 크롤러가 초기 HTML을 보는 시점에서는 변경되지 않습니다. Next.js에서는 `generateMetadata`로 서버에서 올바른 캐노니컬이 포함된 HTML을 생성합니다.
+
+**Q2. 캐노니컬과 redirects는 어떻게 다르나요?**
+
+캐노니컬은 "이 URL의 콘텐츠는 다른 URL의 복사본"이라고 선언하는 반면, redirects는 "이 URL로 오면 다른 URL로 이동시켜라"는 명령입니다. 캐노니컬은 URL을 유지하면서 검색 엔진에 신호를 보내고, redirects는 실제로 사용자를 이동시킵니다.
+
+**Q3. generateMetadata에서 async/await를 사용할 수 있나요?**
+
+네, `generateMetadata`는 async 함수이므로 데이터베이스 조회나 API 호출이 가능합니다. 하지만 캐노니컬 계산은 가벼운 연산으로 유지하세요.
+
+**Q4. 캐노니컬이 검색 엔진에 언제 반영되나요?**
+
+크롤링 주기에 따라 다르지만, 일반적으로 며칠에서 몇 주가 걸릴 수 있습니다. 긴급한 경우 Google Search Console에서 수동 재크롤링을 요청하세요.
+
+**Q5. 그냥 `<link rel="canonical">`을 직접 넣으면 안 되나요?**
+
+기술적으로는 가능하지만, Metadata API를 사용하는 게 좋습니다. 타입 안전성과 자동화를 제공하며, `generateMetadata`로 동적 캐노니컬 생성이 쉽습니다.
+
+## 요약
+
+이번 편에서는 캐노니컬을 중복 방지 신호 교환의 관점으로 살펴보았습니다. CSR에서는 클라이언트에서 캐노니컬을 수동 관리해 일관성이 떨어지지만, Next.js에서는 Metadata API로 서버 측에서 정적·동적 캐노니컬을 제어합니다.
+
+핵심은 중복 콘텐츠에서 검색 엔진 신뢰를 유지하는 패턴입니다. 원본 콘텐츠에 고유 캐노니컬을 지정하고, 파생 페이지에서는 자체 캐노니컬을 유지하며, alternates로 다국어 버전을 지원합니다. 이를 통해 색인 일관성과 공유 신뢰성이 향상됩니다.
+
+## 참조
+
+- Next.js 공식문서
+
+  - [Canonical](https://nextjs.org/learn/seo/canonical)
+  - [Metadata](https://nextjs.org/learn/seo/metadata)
+  - [Metadata API](https://nextjs.org/docs/app/api-reference/functions/generate-metadata)

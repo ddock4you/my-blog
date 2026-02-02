@@ -1,0 +1,338 @@
+---
+title: '크롤링·인덱싱 – 상태코드/robots/sitemap'
+publishedAt: '2025-10-01'
+summary: '상태코드+robots로 이전 글 관리'
+category: '개발'
+series: 'nextjsDocs'
+image: '/contents/posts/series/nextjsDocs/images/17.png'
+---
+
+## 들어가며
+
+5-1편에서 렌더링 전략(SSG/ISR/SSR/Cache Components)이 콘텐츠를 어떻게 검색 엔진에 내보내는지를 살펴보았습니다. 이번에는 그 콘텐츠가 "검색 엔진과의 첫 만남"에서 어떤 신호를 주고받는지를 찬찬히 따라갑니다. 렌더링이 공장에서 제품을 만드는 과정이라면, 크롤링·인덱싱은 그 제품이 유통망에 들어가 소비자에게 전달되고 평가받는 과정입니다.
+
+검색 엔진 크롤러는 페이지를 요청하기 전에 상태코드, robots.txt, sitemap이라는 세 가지 신호를 먼저 읽습니다. 신호가 어긋나면 검색 엔진은 콘텐츠를 잘못 분류하거나 색인에서 제거하며, 잘 맞추면 렌더링 전략의 성과를 온전히 평가할 수 있습니다. 이 편에서는 "삭제된 글/이전된 글"을 대표 시나리오로 301/308/404의 선택과 robots/sitemap 갱신이 어떻게 이어지는지 살펴보겠습니다.
+
+## Next.js 핵심 기능 – 검색 엔진 신호 교환
+
+신호 교환은 검색 엔진과 웹사이트 사이의 양방향 대화입니다. 검색 엔진이 페이지에 도착하기 전에 "이 사이트를 어떻게 다뤄야 할까?"라고 묻는다면, 상태코드·robots.txt·sitemap은 그 답변입니다. 이 교환이 원활해야 검색 엔진이 사이트를 정확히 이해하고 색인합니다. 이제 각 신호를 선택하는 판단 기준을 구체적으로 살펴보겠습니다.
+
+### 상태코드 선택의 원칙
+
+상태코드를 선택할 때는 콘텐츠의 미래 계획을 고려합니다. 각 상태코드는 검색 엔진에 다른 의미를 전달하므로 상황에 맞게 선택해야 합니다. 영구 삭제라면 404로 색인을 제거하고, 재사용 예정이라면 308로 링크 주스를 유지하면서 임시 상태를 알립니다.
+
+| 상태코드 | 링크 주스 처리             | 캐시 영향     | 사용 시점         |
+| :------- | :------------------------- | :------------ | :---------------- |
+| 301      | 새 주소로 완전 이전        | 즉시 업데이트 | 영구 이전         |
+| 302      | 임시 이전 (링크 주스 유지) | 임시 유지     | 일시적 리다이렉트 |
+| 308      | 유지하면서 임시 상태 알림  | 유지          | 일시적 이동       |
+| 404      | 색인 제거                  | 제거          | 페이지 없음       |
+| 410      | 영구 제거 (404 강화)       | 제거          | 콘텐츠 영구 삭제  |
+| 503      | 유지 (임시 서버 문제)      | 캐시하지 않음 | 서버 유지보수     |
+
+> **참고**: 링크 주스는 검색 엔진이 링크로 연결된 페이지에 부여하는 '권한 점수'라고 생각하면 됩니다. 유명한 사람이 다른 사람을 소개하면 그 사람도 자연스럽게 신뢰를 얻는 것과 같아요. 링크 주스가 풍부한 페이지에서 링크를 걸어주면 그 권한이 연결된 페이지로 흘러가 검색 순위를 높여줍니다.
+
+### robots.txt의 접근 경계 설정
+
+robots.txt는 검색 엔진 크롤러의 접근을 제어하는 첫 번째 관문입니다. 크롤링 예산을 효율적으로 사용하기 위해 민감한 영역은 차단하고 공개 콘텐츠는 자유롭게 탐색하도록 합니다. 판단 기준은 "어떤 콘텐츠가 검색 엔진에 노출되어야 하는가"입니다. 공개 페이지와 중요 콘텐츠는 Allow나 생략으로 두고, 관리자 페이지나 민감한 데이터는 Disallow로 보호합니다.
+
+| 규칙 유형 | 역할           | 예시                    | 설명                          |
+| :-------- | :------------- | :---------------------- | :---------------------------- |
+| Disallow  | 크롤링 차단    | `Disallow: /admin/`     | 민감한 경로 접근 제한         |
+| Allow     | 특정 경로 허용 | `Allow: /public/`       | Disallow 내 예외 지정         |
+| Sitemap   | 구조 안내      | `Sitemap: /sitemap.xml` | 크롤러에게 사이트맵 위치 알림 |
+
+### sitemap의 구조 안내 기준
+
+sitemap은 robots.txt가 허용한 영역을 검색 엔진에 구체적으로 안내하는 지도입니다. 각 페이지의 URL, 수정일, 중요도를 포함해 크롤러가 놓치기 쉬운 콘텐츠를 발견하도록 돕습니다. 판단 기준은 "어떤 페이지가 검색 엔진에 더 중요하고 자주 바뀌는가"입니다. 빈번히 업데이트되는 블로그 글은 changefreq를 높게 설정하고, 안정적인 회사 소개 페이지는 낮게 설정합니다.
+
+| 요소       | 역할          | 값 범위                                         | 예시 설명                         |
+| :--------- | :------------ | :---------------------------------------------- | :-------------------------------- |
+| loc        | 페이지 URL    | 전체 URL                                        | `https://example.com/blog/post-1` |
+| lastmod    | 마지막 수정일 | YYYY-MM-DD                                      | `2024-01-15` (실제 수정일)        |
+| changefreq | 변경 빈도     | always/hourly/daily/weekly/monthly/yearly/never | `weekly` (블로그 글)              |
+| priority   | 중요도        | 0.0 ~ 1.0                                       | `0.8` (중요 페이지)               |
+
+이 신호들은 렌더링 전략과 연결됩니다. SSG로 만든 정적 페이지가 sitemap에 포함되고, ISR로 업데이트되는 콘텐츠가 robots.txt로 접근되며, SSR에서 처리된 상태가 상태코드로 전달됩니다. 신호 간 불일치가 생기면 검색 엔진은 사이트 신뢰도를 낮게 평가합니다.
+
+> **참고**: 크롤링·인덱싱은 Next.js의 "검색 엔진 신호 교환 전략"입니다. 상태코드로 상태를, robots로 접근을, sitemap으로 구조를 전달하면서 검색 엔진 이해도를 높입니다.
+
+## 기능 구현 및 비교
+
+삭제된 글/이전된 글 시나리오를 따라갈 때 CSR에서는 모든 신호를 클라이언트에 맡겨야 합니다. 프레임워크 특성상 HTTP 응답은 일단 200이고, robots.txt와 sitemap은 각각 정적 파일이나 별도 서버에서 관리합니다. 신호가 이렇게 파편화되면 검색 엔진은 사이트의 콘텐츠 수명주기를 제대로 이해하지 못합니다.
+
+### 리액트 단독 – 클라이언트 신호 조립
+
+CSR에서는 모든 신호를 브라우저에서 조립해야 합니다. 글 존재 여부를 `fetch`로 확인하고, 실패하면 UI만 바꾸는 방식입니다.
+
+```jsx
+// src/pages/blog/[slug].jsx
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+
+export function BlogPost() {
+  const router = useRouter();
+  const { slug } = router.query;
+  const [post, setPost] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    // 브라우저에서 API 호출로 존재 확인
+    fetch(`/api/posts/${slug}`)
+      .then((res) => {
+        if (res.status === 404) {
+          setError("Post not found");
+          // 검색 엔진은 200 응답만 받음
+          document.title = "404 - Post Not Found";
+        } else {
+          return res.json();
+        }
+      })
+      .then(setPost);
+  }, [slug]);
+
+  if (error) return <div>글을 찾을 수 없습니다</div>;
+  if (!post) return <div>로딩 중...</div>;
+
+  return (
+    <div>
+      <h1>{post.title}</h1>
+      <p>{post.content}</p>
+    </div>
+  );
+}
+```
+
+robots.txt는 정적 파일로 관리하고, sitemap은 별도 서버에서 생성합니다.
+
+```txt
+// public/robots.txt
+User-agent: *
+Disallow: /admin/
+Allow: /
+
+Sitemap: https://example.com/sitemap.xml
+```
+
+이렇게 하면 검색 엔진이 받는 HTTP 응답은 항상 200이고, 삭제된 글이 계속 색인됩니다. robots.txt와 sitemap이 분리되어 배포 복잡성도 늘어납니다.
+
+### 리액트 방식의 한계
+
+첫째, 상태코드는 브라우저가 흉내 냅니다. 404를 UI로 보여줘도 검색 엔진은 200만 받습니다. 둘째, robots.txt와 sitemap이 분리되어 배포도 분리됩니다. 셋째, CDN이 오래된 200 응답을 계속 캐시해 신호가 오래 유지됩니다. 크롤링·인덱싱이 첫 만남이라는 점에서 이런 왜곡은 유기적 트래픽을 깎아먹습니다.
+
+### Next.js 구성 – 서버가 신호를 통제
+
+Next.js는 `app/` 내부에서 상태코드를 결정하고, robots/sitemap을 Route Handler로 생성합니다. 삭제된 글은 `notFound()`로 404, 이전된 글은 `redirect()`로 301/308을 내려줍니다. robots.txt와 sitemap.xml은 각 `route.ts`에서 환경 변수로 사이트 URL을 구성해 실시간으로 반영합니다. 따라서 검색 엔진이 요청할 때 정확한 신호를 받습니다.
+
+```text
+app/
+├── blog/
+│   ├── [slug]/
+│   │   └── page.tsx             // 상태코드
+│   └── page.tsx                 // 목록
+├── robots.txt/
+│   └── route.ts                 // 동적 robots.txt
+├── sitemap.xml/
+│   └── route.ts                 // 동적 sitemap
+└── layout.tsx
+```
+
+```tsx
+// app/blog/[slug]/page.tsx
+import { notFound, redirect } from "next/navigation";
+import { getPostBySlug } from "../../lib/posts";
+
+export default async function BlogPost({ params }: { params: { slug: string } }) {
+  const post = await getPostBySlug(params.slug);
+
+  if (!post) {
+    notFound();
+  }
+
+  if (post.movedTo) {
+    redirect(`/blog/${post.movedTo}`, 301);
+  }
+
+  return (
+    <div>
+      <h1>{post.title}</h1>
+      <p>{post.content}</p>
+    </div>
+  );
+}
+```
+
+```tsx
+// app/robots.txt/route.ts
+import { NextResponse } from "next/server";
+
+export async function GET() {
+  const robotsTxt = `User-agent: *
+Disallow: /admin/
+Allow: /
+
+Sitemap: ${process.env.NEXT_PUBLIC_SITE_URL}/sitemap.xml`;
+
+  return new NextResponse(robotsTxt, {
+    headers: { "Content-Type": "text/plain" },
+  });
+}
+```
+
+```tsx
+// app/sitemap.xml/route.ts
+import { NextResponse } from "next/server";
+import { getAllPosts } from "../../lib/posts";
+
+export async function GET() {
+  const posts = await getAllPosts();
+
+  const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${process.env.NEXT_PUBLIC_SITE_URL}</loc>
+    <lastmod>${new Date().toISOString()}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  ${posts
+    .map(
+      (post) => `
+  <url>
+    <loc>${process.env.NEXT_PUBLIC_SITE_URL}/blog/${post.slug}</loc>
+    <lastmod>${post.updatedAt}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>`
+    )
+    .join("")}
+</urlset>`;
+
+  return new NextResponse(sitemap, {
+    headers: { "Content-Type": "application/xml" },
+  });
+}
+```
+
+### 리액트 vs Next.js 비교표
+
+| 구분               | 리액트 (CSR + 수동 신호 처리)           | Next.js (서버 측 신호 제어 + Route Handler)     |
+| :----------------- | :-------------------------------------- | :---------------------------------------------- |
+| 실행 환경 기본값   | 브라우저에서 API 호출 후 상태 확인      | 서버에서 데이터 조회 후 HTTP 응답 생성          |
+| 데이터 접근 모델   | 클라이언트 fetch + 수동 상태 관리       | 서버 컴포넌트에서 직접 상태코드 + Route Handler |
+| 번들 관점          | 신호 처리 로직이 클라이언트 번들에 포함 | Next.js 기본 기능, 추가 번들 영향 최소          |
+| 컴포넌트 분리 의미 | 신호 로직이 비즈니스 로직과 결합        | 상태코드/라우팅별 분리로 관심사 분리            |
+| 설계의 제약        | 신호 품질이 개발자 역량에 달려          | Route Handler로 자동화된 신호 제어              |
+
+## robots.txt의 트레이드오프
+
+### 장점
+
+- **크롤링 제어**: 검색 엔진 크롤러의 접근을 세밀하게 제어하여 서버 리소스 절약과 민감한 콘텐츠 보호
+- **검색 엔진 신뢰 구축**: 명확한 접근 규칙으로 검색 엔진과의 협력 관계 형성, 크롤 예산 효율적 배분
+- **개발 유연성**: Route Handler로 동적 생성하여 환경별 설정과 실시간 변경 용이
+
+### 단점
+
+- **즉시 반영 불가**: 검색 엔진 캐시로 인해 변경 후 수 시간에서 수 일이 소요되어 긴급 상황 대응 어려움
+- **보안 오해**: 크롤링 제한일 뿐 실제 접근 제어가 아니어서 보안 요구사항과 혼동될 수 있음
+- **과도한 차단 위험**: 모든 경로를 Disallow하면 검색 엔진이 사이트 구조 파악을 못해 색인 저하 발생
+
+### 균형 맞추기 팁
+
+필요한 콘텐츠만 차단하고 sitemap URL을 반드시 포함하세요. 긴급한 경우 robots.txt 대신 상태코드로 직접 제어하고, 민감한 데이터는 서버 측 인증으로 보호하세요. Route Handler를 활용한 동적 생성으로 환경별 차이를 관리하세요.
+
+## 예상 질문
+
+**Q1. CSR에서 상태코드를 어떻게 처리하나요?**
+
+클라이언트에서 `fetch` 상태를 확인할 수 있지만, HTTP 응답 코드는 브라우저에서만 유효합니다. 검색 엔진이 받는 응답은 여전히 200이므로 색인 제거가 제대로 되지 않습니다. Next.js에서는 `notFound()`/`redirect()`로 서버 측에서 올바른 상태코드를 반환합니다.
+
+**Q2. robots.txt 재생성 주기는 어떻게 설정하나요?**
+
+Route Handler는 요청 시마다 실행되므로 실시간 반영됩니다. 하지만 검색 엔진 캐시 때문에 즉시 적용되지 않을 수 있습니다. 긴급한 경우 Google Search Console에서 수동 요청하세요.
+
+**Q3. sitemap에 어떤 정보를 포함해야 하나요?**
+
+URL(loc), 마지막 수정일(lastmod), 변경 빈도(changefreq), 우선순위(priority)를 포함합니다. lastmod는 실제 콘텐츠 수정일을 반영하고, priority는 0.0~1.0 사이로 설정합니다.
+
+**Q4. 상태코드가 CWV에 미치는 영향은?**
+
+직접적입니다. 404 페이지를 빠르게 반환하면 FID(First Input Delay: 첫 입력 지연)가 개선되고, 리다이렉트가 적으면 LCP(Largest Contentful Paint: 최대 콘텐츠풀 페인트)가 향상됩니다. 하지만 잘못된 상태코드는 검색 엔진 신뢰를 떨어뜨려 간접적으로 트래픽을 줄입니다.
+
+**Q5. 검색 엔진이 sitemap을 언제 확인하나요?**
+
+robots.txt를 읽은 후 sitemap을 확인합니다. sitemap은 "안내" 역할을 하므로, robots.txt로 차단된 페이지도 sitemap에 포함할 수 있습니다. 하지만 검색 엔진은 sitemap을 참고로 사용할 뿐입니다.
+
+**Q6. 그냥 `use client`를 페이지에 붙이면 안 되나요?**
+
+기술적으로는 가능하지만, 상태코드 관점에서는 좋지 않습니다. `use client`를 사용하면 해당 컴포넌트가 클라이언트에서 렌더링되어 서버 측 상태코드 제어가 불가능합니다. Next.js에서는 서버 컴포넌트를 우선으로 사용하고, 필요한 부분만 클라이언트 컴포넌트로 만드세요.
+
+**Q7. 클라이언트에서도 fetch 하면 되지 않나요?**
+
+가능하지만, 서버에서 직접 처리하는 것보다 신호 일관성이 떨어집니다. 서버 Route Handler에서 robots/sitemap을 생성하면 환경 변수를 사용해 일관된 URL을 유지할 수 있습니다. CSR에서는 각 요청마다 URL을 하드코딩해야 합니다.
+
+**Q8. 이 제약이 불편한데 왜 이런 설계를 했나요?**
+
+Next.js의 설계는 "검색 엔진 친화적인 웹 개발"을 목표로 합니다. Route Handler와 서버 측 상태코드 제어로 검색 엔진이 신호를 명확히 이해하도록 강제합니다. 처음에는 불편할 수 있지만, 장기적으로 더 나은 검색 순위와 트래픽을 보장합니다.
+
+### 개발 경험 변화 – 코드 리뷰에서 보는 질문들
+
+크롤링·인덱싱을 적용하기 시작하면, 여기서는 "신호가 검색 엔진 신뢰와 맞는가?", "콘텐츠 수명주기가 제대로 반영되는가?"로 바라봅니다. 그리고 이 질문들은 단순한 체크리스트가 아니라 "크롤링·인덱싱 우선 설계를 위한 사고 방식"으로 발전합니다.
+
+제가 생각한 예상 질문들은 이런 형태입니다:
+
+- **상태코드가 콘텐츠 상태와 일치하는가?**
+
+  - 삭제된 콘텐츠는 404, 이전된 콘텐츠는 301/308로 정확히 매핑했는지 확인합니다. 상태코드 선택이 사용자 경험과 검색 엔진 신뢰 사이의 균형을 맞추는지 검토하세요.
+
+- **robots.txt가 크롤링 예산을 효율적으로 분배하는가?**
+
+  - Disallow 규칙이 불필요한 경로만 차단하고, sitemap URL이 포함되는지 확인합니다. robots.txt 변경이 배포에 미치는 영향을 평가하세요.
+
+- **sitemap이 콘텐츠 구조를 정확히 반영하는가?**
+
+  - 모든 공개 페이지가 포함되고, lastmod/priority가 올바른지 검토합니다. 동적 생성으로 콘텐츠 변동을 실시간 반영하는지 확인하세요.
+
+- **클라이언트 측 신호 보강이 없는가?**
+
+  - 브라우저에서 상태코드를 모방하거나 robots를 동적 변경하는 로직이 없는지 확인합니다. 검색 엔진이 혼란스러워할 수 있는 클라이언트 측 신호 개선을 피하세요.
+
+- **신호가 검색 엔진 캐시를 고려하는가?**
+
+  - robots.txt/sitemap 변경이 즉시 반영되지 않는다는 점을 감안해, 긴급한 경우 상태코드로 직접 제어하는 전략이 있는지 평가합니다.
+
+- **크롤링·인덱싱 전략 변경이 배포에 미치는 영향을 평가했는가?**
+
+  - Route Handler 추가가 빌드 시간에 미치는 영향을 고려했는지 확인합니다. 배포 후 Google Search Console 모니터링 계획이 있는지도 검토하세요.
+
+## 요약
+
+이번 글에서는 "크롤링·인덱싱을 검색 엔진과의 양방향 신호 교환으로 이해하는 패턴"을 다루었습니다. 신호 교환은 검색 엔진이 페이지 도착 전에 묻는 질문에 상태코드·robots.txt·sitemap이 답하는 대화입니다.
+
+CSR에서는 클라이언트에서 신호를 조립해 HTTP 응답이 200으로 유지되지만, Next.js에서는 서버에서 상태코드·robots·sitemap을 직접 제어합니다. 각 신호의 선택 기준은 표로 정리했듯이:
+
+- **상태코드**: 콘텐츠 미래 계획에 따라 301/308/404 선택
+- **robots.txt**: 크롤링 예산 최적화를 위해 Disallow/Allow/Sitemap 규칙 적용
+- **sitemap**: 페이지 중요도와 변경 빈도에 따라 loc/lastmod/changefreq/priority 설정
+
+"삭제된 글/이전된 글" 시나리오를 통해 CSR의 한계를 보여주고 Next.js의 Route Handler로 해결하는 과정을 비교했습니다. 결과적으로 다음과 같은 변화가 생깁니다:
+
+- **신호 교환 최적화**: 검색 엔진 질문에 정확한 답변 제공
+- **크롤링 효율화**: robots.txt로 예산 분배, sitemap으로 구조 안내
+- **신뢰도 구축**: 일관된 신호로 검색 엔진 관계 강화
+- **운영 자동화**: Route Handler로 실시간 신호 생성
+- **품질 개선**: 올바른 상태코드로 검색 순위와 CWV 향상
+
+## 참조
+
+- Next.js 공식문서
+
+  - [Crawling and Indexing](https://nextjs.org/learn/seo/crawling-and-indexing)
+  - [Status Codes](https://nextjs.org/learn/seo/status-codes)
+  - [robots.txt](https://nextjs.org/learn/seo/robots-txt)
+  - [XML Sitemaps](https://nextjs.org/learn/seo/xml-sitemaps)
+  - [robots.txt and sitemaps](https://nextjs.org/docs/app/building-your-application/routing/robots-txt-and-sitemaps)
+  - [notFound](https://nextjs.org/docs/app/api-reference/functions/not-found)
+  - [robots.txt](https://nextjs.org/docs/app/api-reference/file-conventions/robots.txt)
+  - [sitemap](https://nextjs.org/docs/app/api-reference/file-conventions/sitemap)

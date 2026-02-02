@@ -1,0 +1,217 @@
+---
+title: '유니온과 리터럴 - “문자열”이 아니라 “값” 그 자체'
+publishedAt: '2025-10-25'
+summary: '리터럴 union으로 액션/상태 정확히 정의'
+category: '개발'
+series: 'typescriptDocs'
+image: '/contents/posts/series/typescriptDocs/images/6.png'
+---
+
+
+## 들어가며
+
+블로그 포스트의 표시 상태를 다루는 코드에서 `status` 문자열을 조건문으로 분기하고 있었습니다. 서버에서 "draft", "published", "archived" 같은 상태를 내려주는 건 알지만, 결국 자바스크립트에서는 그냥 `string`으로 취급했죠. 그래서 포스트가 `status === "published"`일 때만 공개하게 해놨는데, 어느 날 "scheduled"라는 새 상태가 들어왔고, 화면에서는 비공개 포스트로 처리되어 아무도 볼 수 없게 되었습니다. 런타임에서 "scheduled"인 경우엔 기존 로직에 걸리지 않는 코드가 그대로 통과했고, 포스트가 사라진 줄도 모르고 있었죠.
+
+```js
+const status = post.status; // string
+
+if (status === "draft") {
+  showDraftBadge();
+} else if (status === "published") {
+  showPublishedContent();
+} else if (status === "archived") {
+  showArchivedNotice();
+}
+
+// scheduled를 놓쳐도 컴파일 시점에는 빨간 줄 없음
+```
+
+`status`가 "문자열이면 다 통과한다"는 JS의 관성 때문에 생긴 미진한 감지였습니다. 한 줄만 더 쓰면 되는 데도 "string은 다 된다"라는 습관이 고쳐지지 않았습니다.
+
+## TypeScript의 제안
+
+TypeScript는 블로그 포스트 상태의 가능한 값들을 명확히 정의해서 컴파일러가 검증하도록 유도합니다. 블로그 포스트 상태 관리를 안전하게 다루는 방법을 제안합니다.
+
+### 상태 정의: 리터럴 유니온 타입으로 가능한 값 제한
+
+```ts
+const POST_STATUSES = ["draft", "published", "archived", "scheduled"] as const;
+type PostStatus = (typeof POST_STATUSES)[number];
+
+interface PostResponse {
+  id: string;
+  status: PostStatus;
+}
+
+function renderStatus(status: PostStatus) {
+  switch (status) {
+    case "draft":
+      return "초안";
+    case "published":
+      return "게시됨";
+    case "archived":
+      return "보관됨";
+    case "scheduled":
+      return "예약됨";
+  }
+}
+```
+
+`as const`로 배열을 불변 상수로 만들고 `(typeof POST_STATUSES)[number]`로 각 요소의 리터럴 타입을 추출합니다. 이렇게 하면 `status`는 `"draft" | "published" | ...` 같은 좁은 유니온 타입이 되어, 정의되지 않은 값이 들어오면 컴파일 오류가 발생합니다.
+
+## 심층 분석
+
+### 1) 리터럴 타입의 정밀도 차이
+
+문자열 리터럴과 넓은 `string` 타입의 차이를 이해하고 적절히 사용하는 방법을 보여줍니다.
+
+```ts
+const response = { status: "draft" };
+
+type Loose = typeof response.status; // string - 너무 넓음
+type Tight = (typeof POST_STATUSES)[number]; // "draft" | "published" | ...
+
+// 리터럴 타입 유지하기
+const literalResponse = { status: "draft" } as const;
+type LiteralStatus = typeof literalResponse.status; // "draft" - 정확함
+```
+
+일반 객체에서는 속성 값이 `string`으로 넓혀지지만, `as const`를 사용하면 리터럴 값이 유지됩니다. 이는 Redux 액션 타입이나 API 상태처럼 특정 값만 허용해야 하는 경우에 유용합니다.
+
+### 2) 유니온 타입으로 완전한 분기 처리
+
+TypeScript의 **Exhaustiveness Checking**(완전성 검사)은 유니온 타입의 모든 가능한 값을 처리했는지 컴파일 타임에 검증하는 기능입니다. 이를 활용하면 새로운 상태가 추가되었을 때 누락된 처리를 즉시 발견할 수 있습니다.
+
+```ts
+function assertNever(x: never): never {
+  throw new Error("예상치 못한 상태: " + x);
+}
+
+function renderStatus(status: PostStatus) {
+  switch (status) {
+    case "draft":
+      return "초안";
+    case "published":
+      return "게시됨";
+    case "archived":
+      return "보관됨";
+    case "scheduled":
+      return "예약됨";
+    default:
+      return assertNever(status);
+  }
+}
+```
+
+`default` 케이스에서 `assertNever(status)`를 호출하면, 모든 case가 처리되었을 때는 `status`가 `never` 타입이 됩니다. 새로운 상태를 `PostStatus`에 추가했는데 `switch`에서 처리하지 않으면 `status`가 `never`가 아니므로 컴파일 오류가 발생합니다.
+
+### 3) 상수 배열로 타입 안전하게 관리
+
+상수 배열을 `as const`로 선언하고 타입을 추출하는 패턴으로 상태 관리를 중앙화합니다.
+
+```ts
+const POST_STATUSES = ["draft", "published", "archived", "scheduled"] as const;
+type PostStatus = (typeof POST_STATUSES)[number];
+
+// 컴파일 타임 + 런타임 검증
+function validateAndRenderStatus(status: unknown): string {
+  // 컴파일 타임: status가 PostStatus 유니온 타입인지 검사
+  if (!isValidPostStatus(status)) {
+    throw new Error(`알 수 없는 상태: ${status}`);
+  }
+
+  // 런타임: 배열에 포함되는지 실제 검증
+  if (!POST_STATUSES.includes(status as PostStatus)) {
+    throw new Error(`런타임 검증 실패: ${status}`);
+  }
+
+  return renderStatus(status as PostStatus);
+}
+
+// 타입 가드로 컴파일 타임 검사 지원
+function isValidPostStatus(status: unknown): status is PostStatus {
+  return typeof status === "string" && POST_STATUSES.includes(status as PostStatus);
+}
+```
+
+배열을 `as const`로 선언하면 리터럴 타입 추출이 가능하고, `isValidPostStatus` 타입 가드로 컴파일 타임 검증을 지원합니다. 런타임에서는 `includes`로 실제 값 검증을 수행합니다.
+
+### 4) 선언 방식에 따른 타입 추론 차이
+
+`const`와 `let`의 차이가 타입 추론에 미치는 영향을 이해하고 적절히 사용하는 방법을 보여줍니다.
+
+```ts
+// 1. 변수 재할당 시 타입 추론 차이
+const STATUS_PENDING = "pending"; // type: "pending" (리터럴 타입)
+
+const immutableStatus = STATUS_PENDING; // type: "pending" (리터럴 유지)
+let mutableStatus = STATUS_PENDING; // type: string (넓은 타입으로 확장)
+
+// 2. 객체 선언 시 타입 추론 차이
+const literalOrder = { status: "pending" } as const; // status: "pending"
+const wideOrder = { status: "pending" }; // status: string
+```
+
+`const`로 재할당하면 원래의 리터럴 타입이 유지되지만, `let`으로 재할당하면 `string` 같은 넓은 타입으로 확장됩니다. 객체에서는 `as const`를 사용해야 속성이 리터럴 타입으로 유지됩니다.
+
+## 실전 패턴 (In React)
+
+### 상태 기반 UI 렌더링: switch 문으로 완전한 분기 처리
+
+포스트 상태에 따라 다른 UI를 렌더링하는 React 컴포넌트 구현 방법을 보여줍니다.
+
+```tsx
+import clsx from "clsx";
+
+function assertNever(x: never): never {
+  throw new Error("Unexpected status: " + x);
+}
+
+type PostBadgeProps = {
+  status: PostStatus;
+};
+
+function PostBadge({ status }: PostBadgeProps) {
+  switch (status) {
+    case "draft":
+      return <span className={clsx("badge", "badge-gray")}>초안</span>;
+    case "published":
+      return <span className={clsx("badge", "badge-green")}>게시됨</span>;
+    case "archived":
+      return <span className={clsx("badge", "badge-blue")}>보관됨</span>;
+    case "scheduled":
+      return <span className={clsx("badge", "badge-yellow")}>예약됨</span>;
+    default:
+      return assertNever(status);
+  }
+}
+```
+
+switch 문을 사용하면 모든 `PostStatus` 유니온 멤버(`"draft" | "published" | "archived" | "scheduled"`)에 대한 처리가 명시적으로 존재해야 합니다. 새로운 상태를 `PostStatus`에 추가하면 switch 문에도 해당 case를 추가해야 `assertNever(status)`에서 `status`가 `never` 타입으로 유지되며 컴파일 오류가 해결됩니다.
+
+## 함정
+
+1. API 응답을 `const response = await api...`로 받고 타입을 명시하지 않으면 `status`가 `string`으로 흐르고, 유니온 타입 좁히기가 작동하지 않습니다. `post.status`에 `as PostStatus`를 걸거나 `const response: PostResponse = ...`처럼 애초부터 타입을 붙이세요.
+2. 새로운 상태를 추가하면서 `POST_STATUSES` 배열만 바꾸고, `renderStatus`나 `PostBadge` 컴포넌트를 놓치면 여전히 런타임에서 상태가 누락됩니다. switch 문과 `assertNever` 패턴이 "컴파일러가 알려주게" 만드는 유일한 방법입니다.
+3. `const STATES = ["draft", "published"]; type Status = typeof STATES[number];`처럼 했는데, `STATES`가 `let`이거나 `as const` 생략하면 `Status`가 `string`으로 뻗어서 아무런 의미가 없습니다. `as const`를 마지막에 붙여 "이건 정말 상수"라고 선언하세요.
+
+## 예상 질문
+
+**Q1. 상태가 자주 늘어나면 union 타입 선언이 번거롭지 않나요?**
+`POST_STATUSES` 배열에 값을 추가하면 `PostStatus`도 같이 바뀌므로, "배열 + switch 문 + `assertNever`" 세트만 잘 관리하면 깔끔합니다. 상태를 한 곳에 모아두면 새로운 상태가 어디서 쓰이는지 IDE로 바로 확인할 수 있습니다.
+
+**Q2. enum은 안 되나요?**  
+열거형도 쓰일 수 있지만, 문자열 리터럴 유니온은 구조적 타이핑에 더 가깝고, 객체를 만들 때 string literal과 자연스럽게 붙습니다. `enum`은 런타임 객체가 생기기 때문에 트리 쉐이킹에 신경 써야 하며, 단순 값 집합이라면 union + `as const`가 더 가볍습니다.
+
+**Q3. `as const`를 왜 쓰나요?**  
+`as const`는 리터럴을 “불변의 자산”으로 만드는 선언입니다. 배열/객체를 `as const`로 고정하지 않으면, TypeScript는 내부 값을 `string`, `number`처럼 넓게 봅니다. 유니온 타입을 뽑아낼 때 반드시 “값을 계속 그대로 유지하겠다”는 의도를 컴파일러에게 알려주는 수단입니다.
+
+## 요약
+
+문자열은 "그냥 쓰면 되는 값"이 아니라, 가능한 상태의 집합입니다. `as const`로 리터럴을 고정하고 `type X = (typeof list)[number]`로 유니온을 만들면, 컴파일러가 "이 상태가 시스템에 등록돼 있는가"를 검증합니다. switch 문과 `assertNever`를 함께 쓰면 누락된 상태를 컴파일 타임에 잡을 수 있고, React 컴포넌트에서도 상태별 UI가 타입 안전하게 유지됩니다.
+
+## 참조
+
+- TypeScript 공식문서
+  - [Unions and Intersection Types](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#union-types)
+  - [Literal Types](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#literal-types)

@@ -1,0 +1,255 @@
+---
+title: '폰트·이미지 최적화 – next/font, next/image'
+publishedAt: '2025-09-20'
+summary: 'next/font+next/image로 LCP/CLS 잡기'
+category: '개발'
+series: 'nextjsDocs'
+image: '/contents/posts/series/nextjsDocs/images/6.png'
+---
+
+## 들어가며
+
+레이아웃으로 UI 뼈대를 세우고 내비게이션으로 그 뼈대 사이를 오갈 수 있게 된 다음 단계는 스타일링으로 살을 붙인 그 뼈대와 살이 사용자에게 어떻게 전달될지 고려하는 일입니다. 폰트와 이미지가 페이지 로딩에 미치는 영향은 생각보다 큽니다. 특히 LCP(Largest Contentful Paint)와 CLS(Cumulative Layout Shift) 같은 Core Web Vitals 지표에 직접적인 영향을 줍니다.
+
+Next.js App Router에서는 이러한 문제를 `next/font`와 `next/image`로 해결합니다. 이 두 도구가 App Router의 파일 기반 구조와 어떻게 어우러져서 사용자 경험을 개선하는지 함께 살펴보겠습니다.
+
+## 폰트와 이미지 최적화 도구
+
+Next.js는 폰트와 이미지 최적화를 위한 전용 도구를 제공합니다. 이들은 단순한 편의성 도구가 아니라, 빌드 타임 최적화와 런타임 성능 향상을 동시에 달성하는 구조입니다.
+
+### next/font: 폰트 로딩 최적화
+
+`next/font`는 Google Fonts와 로컬 폰트를 빌드 시점에서 분석해 서브셋과 캐시를 생성하고, `display`, `preload` 같은 로딩 전략을 제어합니다. 핵심 문자를 미리 가져오고 `display: 'swap'`을 적용하면 FOUT(Flash of Unstyled Text, 스타일 없는 텍스트 깜빡임)를 줄이면서 랜더링 차단을 최소화합니다.
+
+```tsx
+// app/layout.tsx
+import { Inter, Roboto } from "next/font/google";
+import localFont from "next/font/local";
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter",
+  preload: true,
+});
+
+const roboto = Roboto({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  variable: "--font-roboto",
+});
+
+const customFont = localFont({
+  src: "./fonts/CustomFont.woff2",
+  variable: "--font-custom",
+});
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="ko">
+      <body className={`${inter.variable} ${roboto.variable} ${customFont.variable}`}>
+        {children}
+      </body>
+    </html>
+  );
+}
+```
+
+폰트는 CSS 변수로 정의하여 영역별로 원하는 조합을 적용할 수 있고, `preload`/`display` 설정으로 렌더링 순서와 UX를 세밀하게 컨트롤할 수 있습니다.
+
+### next/image: 이미지 로딩 최적화
+
+`next/image`는 이미지 최적화를 처리합니다. 리사이징, 포맷 변환, 레이지 로딩, CLS 방지 등을 제공합니다.
+
+`next/image`는 빌드 시점에 다양한 크기의 이미지를 생성하고, 브라우저의 뷰포트 크기에 맞는 이미지를 제공합니다. 내부적으로 `srcset`과 `sizes` 속성을 구성하며, WebP/AVIF 포맷으로 변환합니다.
+
+```tsx
+// components/Hero.tsx
+import Image from "next/image";
+
+export function Hero() {
+  return (
+    <Image
+      src="/hero.jpg"
+      alt="Hero image"
+      width={1200}
+      height={800}
+      priority // LCP 최적화: 즉시 로드
+      placeholder="blur" // 로딩 중 블러 효과
+      blurDataURL="data:image/..." // 블러 데이터 URL
+    />
+  );
+}
+```
+
+이 컴포넌트는 빌드 시 다음과 같은 작업을 수행합니다:
+
+- **자동 리사이징**: width/height에 따라 16가지 크기의 이미지를 생성
+- **포맷 최적화**: WebP/AVIF 지원 브라우저에 최적 포맷 제공
+- **반응형 srcset**: `sizes="(max-width: 768px) 100vw, 50vw"` 같은 속성 자동 생성
+- **레이지 로딩**: 뷰포트에 진입할 때만 로드 (기본값)
+- **CLS 방지**: width/height 필수 지정으로 레이아웃 시프트 방지
+
+`priority`로 중요한 이미지를 먼저 로드하고, `placeholder="blur"`로 로딩 중 부드러운 전환을 제공합니다. 컴포넌트 단위에서는 `sizes`, `placeholder`, `blurDataURL` 같은 props를 통해 각 레이아웃 너비와 로딩 상태를 직접 세밀하게 제어할 수 있습니다.
+
+## 리액트 + Vite에서 폰트 및 이미지 최적화 구현 (Next.js 비교 시)
+
+리액트 + Vite 조합에서도 폰트와 이미지 최적화를 구현할 수 있지만, Next.js만큼 자동화되지 않아 수동 관리 부담이 있습니다. Vite는 기본적으로 CSS 최적화와 이미지 import를 지원하지만, 폰트 서브셋과 고급 이미지 최적화는 별도 구현이 필요합니다.
+
+### Vite 환경의 폰트 처리
+
+Vite에서는 CSS import로 Google Fonts를 로드하고, 별도 CSS 파일에서 폰트 표시 전략을 제어합니다.
+
+```tsx
+// src/components/FontLoader.tsx (핵심 로직만)
+import "https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap";
+
+export function FontLoader({ children }) {
+  // 폰트 로드 상태 추적 및 FOUT 방지 로직
+  return children;
+}
+```
+
+```css
+/* src/styles/fonts.css */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap");
+
+body {
+  font-family: "Inter", sans-serif;
+  font-display: swap; /* FOUT 방지 */
+}
+```
+
+### Vite 환경의 이미지 처리
+
+Vite는 이미지 import를 지원하지만, 자동 최적화는 제한적입니다. Intersection Observer로 레이지 로딩을 수동 구현합니다.
+
+```tsx
+// src/components/OptimizedImage.tsx (핵심 로직만)
+import { useState, useRef, useEffect } from "react";
+import heroImage from "../assets/hero.jpg";
+
+export function OptimizedImage({ src, alt, width, height }) {
+  const [isInView, setIsInView] = useState(false);
+  const imgRef = useRef(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) setIsInView(true);
+    });
+    if (imgRef.current) observer.observe(imgRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={imgRef} style={{ width, height }}>
+      {isInView && <img src={heroImage} alt={alt} loading="lazy" />}
+    </div>
+  );
+}
+```
+
+```tsx
+// vite.config.ts (기본 설정)
+import { defineConfig } from "vite";
+
+export default defineConfig({
+  assetsInclude: ["**/*.webp", "**/*.avif"], // 추가 포맷 지원
+});
+```
+
+### Next.js 방식의 특징
+
+1. **자동 최적화**: 빌드 시점에 폰트 서브셋과 이미지 크기를 계산하여 불필요한 리소스 로드를 방지합니다.
+2. **성능 우선**: `next/font`는 렌더링 차단을 최소화하고, `next/image`는 뷰포트에 맞는 이미지만 로드합니다.
+3. **개발자 경험**: 복잡한 설정 없이도 최신 웹 표준을 따르는 최적화를 적용할 수 있습니다.
+
+| 구분        | 리액트 (수동 최적화)           | Next.js (자동 최적화)           |
+| :---------- | :----------------------------- | :------------------------------ |
+| 폰트 로딩   | 외부 CSS 링크 + 수동 관리      | 빌드 시 서브셋 생성 + 자동 캐싱 |
+| 이미지 크기 | 개발자가 직접 srcset 계산      | 자동 리사이즈 + 포맷 변환       |
+| 레이지 로딩 | IntersectionObserver 수동 구현 | 내장 lazy 속성                  |
+| CLS 방지    | width/height 수동 지정         | 필수 속성 적용                  |
+| 캐싱 전략   | 브라우저 기본 동작             | 빌드 타임 최적화 + CDN 활용     |
+
+### 실무 적용 시 중요한 고려사항
+
+`next/font`와 `next/image`는 Next.js의 빌드 타임 최적화 기능에 의존합니다. Vercel에서는 지원되지만, 다른 호스팅 환경에서는 다음과 같은 제약이 있을 수 있습니다:
+
+- **제한적 지원**: 일부 호스팅에서는 빌드 시점 최적화만 가능하고 런타임 최적화는 제한적
+- **외부 서비스 필요**: `next/image`의 자동 최적화가 불가능한 경우 Cloudinary, Imgix 같은 외부 이미지 최적화 서비스를 고려
+- **마이그레이션 고려**: 호스팅 변경 시 최적화 전략 재설계 필요
+
+프로젝트 초기 단계에서 호스팅 환경을 고려하여 최적화 전략을 수립하는 것이 중요합니다.
+
+## 예상 질문
+
+**Q. next/image에서 외부 이미지(URL)를 사용할 수 있나요?**
+
+네, 가능합니다. 다만 `next.config.js`에서 도메인을 허용 목록에 추가해야 합니다:
+
+```js
+// next.config.js
+module.exports = {
+  images: {
+    domains: ["example.com", "cdn.example.com"],
+    // 또는 remotePatterns 사용 (더 안전)
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "example.com",
+        port: "",
+        pathname: "/images/**",
+      },
+    ],
+  },
+};
+```
+
+**Q. 폰트 최적화가 SEO에 미치는 영향은?**
+
+폰트 로딩은 Core Web Vitals의 CLS 지표에 직접적인 영향을 미칩니다. `display: 'swap'`을 사용하면 FOUT 현상을 방지할 수 있지만, 초기에는 시스템 폰트가 표시되어 잠시 차이가 날 수 있습니다. SEO 측면에서는 폰트 로딩 속도가 페이지 속도 점수에 영향을 미치므로 최적화가 중요합니다.
+
+**Q. 이미지 최적화로 인한 저장 공간 사용량은 어떻게 되나요?**
+
+`next/image`는 빌드 시점에 여러 크기의 이미지를 생성하므로 저장 공간이 증가합니다. 일반적으로 원본 이미지의 2-3배 정도의 공간이 필요합니다. 하지만 이로 인해 네트워크 전송량이 크게 줄어드는 효과가 있습니다.
+
+### 최적화 전략의 트레이드오프
+
+#### 장점
+
+- **Core Web Vitals 개선**: LCP/CLS 점수 향상으로 사용자 경험이 크게 개선되고, 실제 성능 체감도 향상
+- **개발자 경험 향상**: 선언적 API로 복잡한 최적화 로직을 추상화하여 간단한 props 설정만으로 고급 최적화 적용
+- **SEO 순위 상승**: 빠른 로딩 속도로 검색 엔진 순위에 긍정적 영향, 특히 모바일 검색에서 유리
+- **반응형 자동 최적화**: 다양한 디바이스와 네트워크 환경에 자동으로 최적화된 리소스 제공
+
+#### 단점
+
+- **빌드 시간 증가**: 이미지 리사이징, 포맷 변환, 폰트 서브셋 생성 등의 빌드 타임 작업으로 초기 빌드 시간이 길어짐
+- **저장 공간 사용량 증가**: 여러 크기와 포맷의 이미지 생성으로 디스크 사용량이 원본의 2-3배로 증가
+- **외부 서비스 의존성**: Next.js의 기본 `next/image` 최적화는 런타임에서 서버 또는 Edge 함수가 실제로 이미지를 리사이징해야 하므로, 정적 호스팅(예: `next export`)이나 자체 관리 서버가 해당 기능을 지원하지 않으면 Cloudinary, Imgix 같은 외부 이미지 CDN을 `loader`로 연결하거나 완전히 `unoptimized` 모드로 전환해야 합니다. 이러한 경우 외부 서비스가 최적화 워크플로우를 대신 수행하게 되므로 추가 설정과 비용이 발생할 수 있습니다.
+- **API 학습 곡선**: 기존 HTML 태그와 다른 Next.js 전용 API를 익히는 데 초기 시간 소요
+
+#### 균형 맞추기 팁
+
+LCP에 영향을 미치는 히어로 이미지나 주요 콘텐츠에는 `priority`를 적용하고, 나머지는 레이지 로딩으로 처리하세요. Vercel 같은 호스팅 환경에서는 빌드 캐시가 효과적으로 작동하므로 빌드 시간 증가가 큰 문제가 되지 않습니다. 또한 저장 공간은 성능 향상으로 인한 이점이 더 크다는 점을 고려하세요.
+
+## 요약
+
+- **Next.js 본질**: App Router 구조와 결합된 빌드 타임 최적화 도구
+- **주요 강점**: Core Web Vitals(LCP/CLS) 개선과 선언적 API로 개발자 경험 향상
+- **핵심 차별화**: `next/font`(서브셟 생성, FOUT 방지)와 `next/image`(자동 리사이징, 포맷 변환, CLS 방지)의 자동화된 최적화
+- **실무적 가치**: SEO 개선과 사용자 경험 향상
+
+웹페이지를 로드할 때 소스를 받아오거나 레이아웃을 계산하는 과정에서 이미지와 폰트가 차지하는 비중이 상당히 큽니다. 이미지와 폰트 최적화에 관심이 있으시다면 아래의 링크(폰트, 이미지 최적화에 대한 참고 문서)가 도움이 될 수 있습니다.
+
+## 참조
+
+- Next.js 공식문서
+  - [Optimizing Fonts and Images](https://nextjs.org/learn/dashboard-app/optimizing-fonts-images)
+  - [Getting Started: Image Optimization | Next.js](https://nextjs.org/docs/app/getting-started/images)
+  - [Getting Started: Font Optimization | Next.js](https://nextjs.org/docs/app/getting-started/fonts)
+- 폰트, 이미지 최적화에 대한 참고 문서
+  - [Multimedia: Images - Learn web development | MDN](https://developer.mozilla.org/en-US/docs/Learn_web_development/Extensions/Performance/Multimedia)
+  - [Web fonts - Learn web development | MDN](https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Text_styling/Web_fonts)
+  - [How Core Web Vitals affect application SEO: Understanding Google page experience ranking and Lighthouse scores - Vercel](https://vercel.com/blog/how-core-web-vitals-affect-seo)

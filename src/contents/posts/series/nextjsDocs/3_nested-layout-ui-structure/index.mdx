@@ -1,0 +1,492 @@
+---
+title: '레이아웃과 페이지 – 중첩 레이아웃으로 UI 뼈대'
+publishedAt: '2025-09-17'
+summary: '레이아웃 그룹으로 UI 경계 마련'
+category: '개발'
+series: 'nextjsDocs'
+image: '/contents/posts/series/nextjsDocs/images/3.png'
+---
+
+## 들어가며
+
+지난 글에서 Next.js가 리액트 기반 풀스택 프레임워크로 어떤 의미를 가지는지, 그리고 App Router가 등장하는 배경을 살펴보았습니다. 이제 그 구조를 직접 쌓아 올릴 차례입니다. 이 장에서는 "레이아웃과 페이지를 어떻게 설계해야 전체 UI 흐름이 자연스럽고 유지보수가 쉬워질까?"라는 질문을 중심으로 App Router의 중첩 레이아웃과 동적 라우팅을 살펴보는 방향으로 나아가겠습니다.
+
+App Router에서는 파일 구조 자체가 라우팅을 정의하니, 내가 만드는 폴더 하나하나가 곧 URL이 됩니다. 결국 공간을 정의하는 방식이 곧 구조를 설계하는 방식이 되는 셈입니다. 이 관점으로 레이아웃을 상향 배치시키고, 동적 콘텐츠를 위한 유연한 경로를 설계하는 전략을 천천히 탐색해봅니다.
+
+## App Router 중첩 레이아웃
+
+Next.js의 App Router를 쓰면 루트, 세그먼트(URL 경로의 각 부분, 예: `/dashboard/settings`에서 `dashboard`, `settings`), 그리고 페이지가 구체적인 역할을 가지며 자연스럽게 공통 영역을 공유하게 됩니다.
+
+- **루트 `app/layout.tsx`**는 `<html>`과 `<body>`를 정의하며, 모든 레이아웃의 최상단 역할을 합니다. 글로벌 폰트나 공통 CSS, 메타를 이곳에 설정합니다.
+- **세그먼트 레이아웃**(`app/(group)/layout.tsx` 등)은 특정 경로 그룹에 고유한 헤더/사이드바/내비게이션을 제공합니다. 이때 각각의 레이아웃은 상위 children을 감싸면서 공통 UI를 전달하고, 내부 세그먼트로 props를 넘겨줍니다.
+- **`page.tsx`**는 각 URL에 대응하는 실제 콘텐츠로, 레이아웃의 children 자리에 들어갑니다. 페이지 자체에서도 추가 레이아웃을 가질 수 있습니다.
+
+리액트 + React Router(라우트 설정 라이브러리)에서는 동일한 헤더를 여러 페이지에 붙이려면 상위 `<Layout>`(공통 레이아웃 컴포넌트)을 만든 후 `<Outlet>`(하위 라우트 렌더링 자리표시자)을 배치하는 방식이 일반적이었습니다. 그런데 Next.js App Router에서는 디렉토리 구조만 만들면 동일한 패턴이 자동으로 리플렉티브하게(자동으로 반영되는) 적용됩니다.
+
+중첩 레이아웃의 가장 큰 강점은 **부분 렌더링**입니다. 루트 레이아웃 → 세그먼트 레이아웃 → 페이지가 순차적으로 렌더링되며, 중간 레이어의 변화 없이 하위 페이지만 바뀌는 경우 스트리밍(점진적 콘텐츠 전송)과 캐싱을 활용할 여지가 커집니다. 또한, 나중에 자세히 배울 `loading.tsx`나 `error.tsx` 같은 Next.js 전용 컴포넌트들을 각 레이어마다 두어 특정 세그먼트만 별도의 로딩/오류 UI를 보여줄 수 있습니다.
+
+## 기능 구현 및 비교
+
+### 리액트 + react router 구성
+
+리액트 + React Router에서는 다음과 같은 구조를 만들어야 했습니다.
+
+```text
+src/
+├── components/
+│   └── Layout.jsx    // 공통 레이아웃 컴포넌트
+├── App.jsx          // 라우트 설정
+└── main.jsx
+```
+
+먼저 `Layout.jsx`에서 공통 UI를 정의합니다:
+
+```jsx
+// src/components/Layout.jsx
+import { Outlet } from "react-router-dom";
+
+export function Layout() {
+  return (
+    <div>
+      <header>헤더</header>
+      <main>
+        <Outlet /> {/* 여기서 각 페이지가 렌더링됨 */}
+      </main>
+      <footer>푸터</footer>
+    </div>
+  );
+}
+```
+
+그 다음 `App.jsx`에서 라우트를 설정합니다:
+
+```jsx
+// src/App.jsx
+import { Routes, Route } from "react-router-dom";
+import { Layout } from "./components/Layout";
+import { Home } from "./pages/Home";
+import { Dashboard } from "./pages/Dashboard";
+
+export function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<Layout />}>
+        <Route index element={<Home />} />
+        <Route path="dashboard" element={<Dashboard />} />
+      </Route>
+    </Routes>
+  );
+}
+```
+
+React Router에서는 **개발자가 직접 라우트 구조를 JSX로 선언**해야 합니다. `Layout`을 부모로 두고, 자식 라우트들을 중첩시키는 방식입니다.
+
+이 방식의 한계는 무엇일까요? 음악 스트리밍 앱을 만든다고 생각해봅시다. "플레이리스트 보기"와 "음악 재생 화면"을 하나의 큰 `Layout` 컴포넌트 안에서 모두 처리해야 합니다. 각 화면의 사이드바나 컨트롤을 다르게 구성하려면 복잡한 조건문이나 별도 라우트 설정이 필요합니다.
+
+### Next.js App Router 구성
+
+Next.js에서는 다음과 같은 `app/` 트리를 만들어 중첩 레이아웃을 구현합니다.
+
+```text
+app/
+├── layout.tsx
+├── page.tsx
+├── dashboard/
+│   ├── layout.tsx
+│   ├── page.tsx
+│   └── settings/
+│       └── page.tsx
+└── marketing/
+    ├── layout.tsx
+    └── page.tsx
+```
+
+`dashboard/layout.tsx`는 대시보드 영역에서만 필요한 사이드바와 내비게이션을 챙깁니다. 각 레이아웃은 `children`을 감싸면서 공통 처리(예: `SessionProvider`, `ThemeProvider`)를 지나게 하고, 하위 세그먼트가 더 구체적인 구조를 덧씌울 수 있게 합니다.
+
+예를 들어 위에서 언급한 **음악 스트리밍 앱**을 Next.js로 만든다면:
+
+- `playlist/layout.tsx`: 플레이리스트 목록 전용 사이드바와 검색 기능
+- `player/layout.tsx`: 음악 재생 컨트롤과 현재 재생중인 트랙 정보
+
+React Router에서는 "플레이리스트 보기"와 "음악 재생 화면"을 하나의 큰 `<Layout>` 컴포넌트 안에서 모두 처리해야 했지만, Next.js에서는 폴더 구조만으로 자연스럽게 "플레이리스트 영역"과 "재생 영역"이 분리됩니다. 각 폴더가 마치 독립적인 "방"처럼 자신의 레이아웃을 가지는 거죠.
+
+이러한 구조는 React Router 방식보다 명확하게 구분됩니다. 라우트에 대응하는 폴더 하나하나가 실제 UI 경계를 나타내므로, 누가 어떤 영역을 책임지는지 추적하기 수월합니다.
+
+구체적으로 말하면, 클라이언트 사이드 라우팅에서는 경로가 바뀔 때 라우터가 "어떤 컴포넌트를 보여줄지"를 다시 계산하지만, **같은 레이아웃 아래에서 이동하는 경우 부모(레이아웃) 컴포넌트는 보통 유지**되고 바뀌는 부분만 교체됩니다. 즉 차이는 "UI 영역을 어디까지 독립적으로 관리할 수 있느냐"에 있습니다. React Router에서는 **레이아웃/로딩/에러 같은 독립 영역을 만들기 위해 라우트 트리(구조)를 직접 설계**해야 하지만, Next.js에서는 폴더 구조만으로 그 경계가 자연스럽게 생깁니다.
+
+### 리액트 vs Next.js 비교표
+
+| 구분          | 리액트 (React Router 중심)                         | Next.js (App Router)                       |
+| :------------ | :------------------------------------------------- | :----------------------------------------- |
+| 라우트 정의   | `<Route>` 컴포넌트 선언 (Declarative 모드 또는 v6) | 디렉토리/파일 구조                         |
+| 레이아웃 공유 | 상위 `<Layout>` 직접 배치                          | 상위 레이아웃 자동 중첩                    |
+| 별도 파일     | 여러 레이아웃을 혼합해야 함                        | 각 폴더 단위로 책임 명확                   |
+| 로딩/에러     | 전역 상태로 처리                                   | Next.js는 세그먼트 단위 스트리밍 경계 설정 |
+| 부분 렌더링   | 수동                                               | 브라우저 스트리밍 최적화                   |
+
+## Next.js 고유 기능 – 중첩 레이아웃의 세부 전략
+
+App Router가 가져온 새로운 개념 몇 가지를 조금 더 깊이 들여다보겠습니다.
+
+### Route Group
+
+```text
+app/
+├── (main)/
+│   ├── layout.tsx
+│   ├── home/
+│   │   └── page.tsx
+│   └── about/
+│       └── page.tsx
+└── (auth)/
+    ├── layout.tsx
+    └── login/
+        └── page.tsx
+```
+
+`(group)` 디렉토리는 경로 이름에 영향을 주지 않으면서 공통 레이아웃을 묶습니다. 예를 들어 `app/(main)/home/page.tsx`와 `app/(main)/about/page.tsx`를 둘러싼 `app/(main)/layout.tsx` 안에서 네비게이션을 렌더링하면 두 페이지 모두 같은 내비를 공유하면서도 URL에는 `(main)`이 나타나지 않습니다. 지금처럼 하나의 `app/(main)`이 여러 섹션을 품고 있을 때, 그룹을 사용하면 공통 스타일과 상태를 한 번만 정의할 수 있어서 중첩 레이아웃 설계가 훨씬 명확해집니다.
+
+### template.tsx
+
+**template.tsx**는 **페이지 전환 시 HTML 구조는 유지하되 React 상태는 리셋하는 특수한 컴포넌트**로, `layout.tsx`와 비슷하게 보이지만 아주 중요한 차이가 있습니다. 중요한 점은 template.tsx는 **항상 layout.tsx와 함께 사용되며 단독으로 사용할 수 없다는 것**입니다. 쉽게 말하면 layout.tsx는 "집 전체"처럼 모든 걸 유지하는 반면(React 상태, DOM, 스타일링 모두), template.tsx는 "방의 가구 배치"만 유지하고 방 안의 물건들은 새로 정리하는 방식입니다.
+
+#### 사용 구조
+
+```text
+app/dashboard/
+├── layout.tsx      // 외부 틀: 상태 유지 (사이드바, 툴바 등)
+├── template.tsx    // 내부 틀: HTML 틀만 유지, React 상태 리셋
+└── page.tsx        // 콘텐츠: 완전히 새로고침
+```
+
+```tsx
+export default function DashboardTemplate({ children }: { children: React.ReactNode }) {
+  return (
+    <section className="dashboard-panel">
+      <header>대시보드 빠른 링크</header>
+      <main>{children}</main>
+    </section>
+  );
+}
+```
+
+#### 핵심 차이점
+
+| 측면                     | layout.tsx | template.tsx |
+| ------------------------ | ---------- | ------------ |
+| **HTML 구조**            | 유지       | 유지         |
+| **CSS 스타일**           | 유지       | 유지         |
+| **React 컴포넌트 상태**  | **유지**   | **리셋**     |
+| **JavaScript 변수**      | 유지       | 리셋         |
+| **사용자 인터랙션 상태** | 유지       | 리셋         |
+
+#### 실행 순서
+
+`layout.tsx` → `template.tsx` → `page.tsx` (template.tsx는 layout.tsx의 children으로 렌더링됩니다)
+
+#### 실제 사용 예시
+
+1. **이메일 앱:**
+
+   - **layout.tsx**: 사이드바와 툴바 상태 유지 (선택된 메일함, 검색어)
+   - **template.tsx**: 메일 리스트 컨테이너 틀만 유지, 내용은 새로 로드
+
+2. **쇼핑몰:**
+   - **layout.tsx**: 헤더/푸터와 장바구니 상태 유지
+   - **template.tsx**: 상품 그리드 틀만 유지, 상품 목록은 새로 로드
+
+### 서버 컴포넌트 vs 클라이언트 컴포넌트 혼용
+
+먼저 간단히 용어부터 정리해보겠습니다. **서버 컴포넌트**는 서버에서 렌더링되는 컴포넌트로, 데이터 fetching이나 초기 HTML 생성에 유리합니다. 반면 **클라이언트 컴포넌트**는 브라우저에서 실행되는 컴포넌트로, 사용자 인터랙션이나 상태 관리를 담당합니다. (이 개념은 3-1편에서 더 자세히 다룰 예정입니다.)
+
+레이아웃은 기본적으로 서버 컴포넌트이지만, 내비게이션이나 버튼을 포함해야 한다면 `use client`를 필요한 레이어(자식 클라이언트 컴포넌트)에만 추가합니다。 예컨대 `(dashboard)/layout.tsx`에서는 서버 컴포넌트로 전체 구조를 잡고, `<NavMenu />`를 별도 `app/components/NavMenu.tsx` 클라이언트 컴포넌트로 만들어 `use client`를 붙이는 식으로 인터랙션과 서버 렌더링을 분리할 수 있습니다.
+
+이러한 전략들은 App Router의 독특한 접근 방식을 보여줍니다. 특히 대규모 애플리케이션에서 서브 시스템이 각각의 레이아웃을 갖고 있을 때, "어느 영역이 살아 있고 어느 영역이 pending인지"를 경로 단위로 구분할 수 있는 점이 App Router의 특징입니다.
+
+## 동적 라우팅 패턴
+
+App Router의 중첩 레이아웃을 넘어, 실제 애플리케이션에서는 정적인 경로 외에 동적인 경로가 필요합니다. Next.js에서는 폴더명에 특수한 패턴을 적용하여 URL이 변하는 페이지를 처리합니다. 앞서 `(dashboard)`와 `(marketing)` 라우트 그룹처럼 UI 경계를 나눠둔 시나리오를 생각해보면, 각 그룹 안에서 플레이리스트/재생, 상품/캠페인처럼 경로에 따라 바뀌는 하위 페이지가 자연스럽게 이어져야 합니다. 그때 `[param]`, `[...param]`, `[[...param]]` 패턴이 URL을 유연하게 다루면서 각 세그먼트가 자신만의 목록 → 상세 → 카테고리 구조를 책임질 수 있게 도와줍니다.
+
+아래에서 설명하는 각 패턴은 레이아웃 트리에서 어떤 세그먼트에 붙여지는지가 핵심입니다. `(dashboard)`에는 `dashboard/playlist/[slug]`처럼 대시보드 내부 콘텐츠를 빠르게 드릴다운(점점 더 자세한 정보로 들어가는 것)하는 `[param]`이 어울리고, `(marketing)`에는 `campaigns/[...slug]` 같은 캐치 올이 대시보드와 별개로 세분화된 캠페인/문서 영역을 책임지는 식입니다. 이처럼 경로 패턴을 레이아웃 경계와 대응시키면 자연스럽게 "폴더=경계" 감각이 유지됩니다.
+
+### 다이나믹 라우트 (Dynamic Routes) `[param]`: 하나씩 매칭되는 동적 경로
+
+예를 들어 `(dashboard)` 레이아웃 아래에서 `playlist/[slug]/page.tsx`를 둔다면, 사이드바와 헤더는 유지된 채에서 특정 플레이리스트 상세로 내려갈 때 `[slug]` 부분이 바뀝니다. 이처럼 세그먼트 내부의 “목록 → 상세” 전개는 `[param]`으로 깔끔히 처리됩니다.
+
+대괄호로 폴더명을 묶으면 그 부분이 변수로 작동합니다. 하나의 값만 받는 경우에 사용합니다.
+
+```text
+app/
+├── (dashboard)/
+│   └── playlist/
+│       └── [slug]/
+│           └── page.tsx    // /dashboard/playlist/my-album
+│   └── page.tsx              // 대시보드 메인
+└── (marketing)/
+    └── blog/
+        └── page.tsx          // /marketing/blog
+```
+
+```tsx
+// app/blog/[slug]/page.tsx
+export default function BlogPost({ params }: { params: { slug: string } }) {
+  return (
+    <article>
+      <h1>{params.slug}에 대한 블로그 글</h1>
+      <p>여기에 {params.slug} 관련 콘텐츠를 표시합니다.</p>
+    </article>
+  );
+}
+```
+
+#### 특징
+
+- **단순하고 직관적**: URL에서 딱 하나의 부분만 변합니다. 예를 들어 `/products/123`에서 `123` 부분만 바뀝니다.
+- **쉬운 데이터 접근**: `params.id`처럼 단일 값으로 바로 사용할 수 있어 코드가 간단합니다.
+- **데이터베이스 친화적**: 제품 ID나 블로그 글의 슬러그처럼 데이터베이스 필드와 직접 매핑하기 좋습니다.
+- **예측 가능한 구조**: URL 패턴이 단순해서 SEO와 사용자 경험에 유리합니다.
+
+#### 언제 사용하나요?
+
+- **블로그 글 상세**: `/blog/hello-world`, `/blog/nextjs-guide`
+- **제품 상세**: `/products/123`, `/products/456`
+- **사용자 프로필**: `/users/john`, `/users/jane`
+
+### 캐치 올 라우트 (Catch-All Routes) `[...param]`: 여러 단계 경로를 한 번에
+
+마케팅 영역의 문서/캠페인처럼 “/campaigns/2025/holiday”처럼 여러 레벨을 처리해야 할 때는 `(marketing)` 하위에 `[...slug]`를 두어 각 세그먼트가 순차적으로 파악되도록 합니다.
+
+대괄호 안에 점 세 개(`...`)를 넣으면 그 이후의 모든 경로를 배열로 캡처합니다.
+
+```text
+app/
+└── (marketing)/
+    └── campaigns/
+        └── [...slug]/
+            └── page.tsx    // /marketing/campaigns/2025/holiday
+```
+
+```tsx
+// app/docs/[...slug]/page.tsx
+export default function DocPage({ params }: { params: { slug?: string[] } }) {
+  const pathSegments = params.slug || [];
+  const fullPath = pathSegments.join("/");
+
+  return (
+    <div>
+      {/* 브레드크럼 네비게이션 */}
+      <nav>
+        <span>문서</span>
+        {pathSegments.map((segment, index) => (
+          <span key={index}> / {segment}</span>
+        ))}
+      </nav>
+
+      {/* 동적 콘텐츠 */}
+      <article>
+        <h1>{pathSegments[pathSegments.length - 1] || "문서 홈"}</h1>
+        <p>{fullPath}에 대한 문서 내용입니다.</p>
+      </article>
+    </div>
+  );
+}
+```
+
+#### 특징
+
+- **유연한 경로 처리**: URL의 여러 세그먼트를 한 번에 잡아낼 수 있어 `/docs/api/routes`처럼 깊은 계층 구조를 쉽게 다룹니다.
+- **배열 형태로 전달**: `params.slug`가 `["api", "routes"]`처럼 문자열 배열로 오기 때문에, 각 부분을 개별적으로 처리할 수 있습니다.
+- **브레드크럼 자동 생성**: 배열 구조를 활용하면 계층적 내비게이션(브레드크럼)을 쉽게 만들 수 있습니다.
+- **확장성 좋음**: 새로운 하위 경로를 추가해도 별도 라우트 설정이 필요 없어 유지보수가 편합니다.
+
+#### 언제 사용하나요?
+
+- **문서 사이트**: `/docs/getting-started`, `/docs/api/routes`
+- **카테고리 구조**: `/shop/electronics/phones`, `/shop/clothing/shirts`
+- **다중 레벨 내비게이션**: `/company/about/team`, `/company/careers/frontend`
+
+### 옵셔널 캐치 올 라우트 (Optional Catch-All Routes) `[[...param]]`: 있어도 되고 없어도 되는 경로
+
+이 패턴은 `marketing` 영역처럼 루트와 특정 카테고리(예: `/campaigns`와 `/campaigns/electronics`)를 같은 UI 안에서 처리하고 싶을 때 유용합니다.
+
+이중 대괄호를 사용하면 해당 경로가 선택사항이 됩니다. 루트와 하위 경로 모두 처리할 수 있습니다.
+
+```text
+app/
+└── (marketing)/
+    └── campaigns/
+        └── [[...category]]/
+            └── page.tsx    // /marketing/campaigns, /marketing/campaigns/electronics
+```
+
+```tsx
+// app/shop/[[...category]]/page.tsx
+export default function ShopPage({ params }: { params: { category?: string[] } }) {
+  const categories = params.category || [];
+
+  if (categories.length === 0) {
+    return <div>모든 상품 카테고리</div>;
+  }
+
+  return (
+    <div>
+      <h1>{categories.join(" > ")} 카테고리</h1>
+      <p>선택한 카테고리의 상품들...</p>
+    </div>
+  );
+}
+```
+
+#### 특징
+
+- **선택적 경로 지원**: 경로가 있어도 되고 없어도 되는 유연한 구조로, `/shop`과 `/shop/electronics`를 같은 컴포넌트에서 처리할 수 있습니다.
+- **기본값 처리 용이**: `params.category`가 `undefined`일 수 있어 조건부로 처리하기 쉽습니다.
+- **점진적 확장 가능**: 처음에는 루트 페이지만 만들고, 나중에 카테고리 기능을 추가할 때 구조 변경 없이 확장할 수 있습니다.
+- **SEO 친화적**: 같은 페이지에서 다양한 URL을 처리할 수 있어 검색 엔진 최적화에 유리합니다.
+
+#### 언제 사용하나요?
+
+- **쇼핑몰 카테고리**: `/shop` (전체 상품), `/shop/electronics` (전자제품), `/shop/electronics/phones` (휴대폰)
+- **블로그 태그**: `/blog` (모든 글), `/blog/react` (React 관련 글), `/blog/react/hooks` (React Hooks 글)
+- **대시보드 필터**: `/dashboard` (전체 데이터), `/dashboard/sales` (매출 데이터), `/dashboard/sales/2024` (2024년 매출)
+- **문서 섹션**: `/docs` (전체 문서), `/docs/getting-started` (시작 가이드), `/docs/api/database` (데이터베이스 API)
+
+### 동적 라우팅 패턴 비교표
+
+위 비교표는 `(dashboard)`와 `(marketing)`이라는 두 레이아웃 그룹의 대표적인 URL 구조를 중심으로, 어떤 패턴이 어떤 식으로 매칭되는지를 정리해둔 것입니다.
+
+| 패턴          | URL 예시                         | params 값                                              | 사용 사례      |
+| ------------- | -------------------------------- | ------------------------------------------------------ | -------------- |
+| `[id]`        | `/products/123`                  | `{ id: "123" }`                                        | 단일 항목 상세 |
+| `[...path]`   | `/docs/api/routes`               | `{ path: ["api", "routes"] }`                          | 계층적 콘텐츠  |
+| `[[...path]]` | `/shop` 또는 `/shop/electronics` | `{ path: undefined }` 또는 `{ path: ["electronics"] }` | 선택적 계층    |
+
+### 동적 라우팅의 실무적 고려사항
+
+동적 라우트를 사용할 때는 몇 가지 트레이드오프를 고려해야 합니다. 먼저 **빌드 타임 vs 런타임**의 차이입니다. 정적 경로는 빌드 시점에 모두 생성되지만, 동적 경로는 요청 시점에 생성됩니다.
+
+또한 **캐치 올 라우트의 범위**를 신중히 설정해야 합니다. `[...slug]`는 모든 하위 경로를 잡아내기 때문에, 의도치 않게 다른 라우트를 가로챌 수 있습니다. 예를 들어 `/docs/api/[...slug]`처럼 더 구체적인 경로를 먼저 배치하는 전략이 필요합니다.
+
+일반적으로 다음과 같은 패턴을 많이 사용합니다:
+
+- `[id]` - 단일 식별자 (제품 상세, 사용자 프로필)
+- `[...path]` - 계층적 콘텐츠 (문서, 카테고리)
+- `[[...slug]]` - 옵셔널 캐치 올 (루트와 하위 경로 모두 처리)
+
+이러한 동적 라우팅 패턴들은 파일 시스템의 단순함을 유지하면서도, 데이터베이스나 CMS에서 오는 복잡한 URL 구조를 자연스럽게 처리할 수 있게 해줍니다.
+
+## 중첩 레이아웃 설계의 트레이드오프
+
+### 장점
+
+- **코드 재사용성 향상**: 공통 UI(헤더, 사이드바, 푸터)를 한 번 정의하면 자동으로 모든 하위 경로에서 공유되어 중복 코드를 크게 줄임
+- **UI 일관성 보장**: 모든 페이지가 같은 레이아웃 체계를 따르기 때문에 사용자 경험이 통일되고 브랜딩이 강화됨
+- **성능 최적화**: 부분 렌더링 덕분에 상위 레이아웃은 유지된 채 하위 페이지만 교체되어 불필요한 재렌더링을 방지함
+
+### 단점
+
+- **디버깅 복잡성 증가**: 깊은 중첩 구조에서 어느 레이아웃이 어떤 데이터를 제공하는지 추적하기 어려워질 수 있음
+- **유연성 제한**: 특정 페이지만 다른 레이아웃을 원할 때 전체 폴더 구조를 변경해야 하는 구조적 제약이 있음
+- **학습 곡선**: 파일 시스템 기반 라우팅 개념이 익숙하지 않으면 초반에 혼란을 겪을 수 있음
+
+#### 균형 맞추기 팁
+
+- 대부분의 페이지가 공유하는 공통 패턴(헤더/내비게이션)을 레이아웃으로 추출하고, 예외적인 페이지는 별도 처리하거나 Route Group을 활용하세요. 예를 들어 `(dashboard)` 그룹 안에서는 대시보드 전용 레이아웃을 공유하되, 완전히 다른 도메인인 `(marketing)`은 별도 레이아웃으로 분리하는 방식입니다.
+
+## 예상 질문
+
+**Q1. 동적 라우트의 우선순위는 어떻게 결정되나요?**
+
+Next.js는 더 구체적인 경로를 먼저 매칭합니다. `[id]` 같은 구체적인 라우트가 `[...slug]` 같은 넓은 범위 라우트보다 먼저 평가됩니다. 따라서 넓은 범위의 라우트는 마지막에 배치하세요.
+
+**Q2. 타입스크립트에서 params의 타입 안전성은 어떻게 보장하나요?**
+
+```tsx
+interface ProductPageParams {
+  id: string;
+}
+
+export default function ProductPage({ params }: { params: ProductPageParams }) {
+  // params.id는 항상 string임을 타입스크립트가 보장
+  // 컴파일 타임에 타입 에러를 잡을 수 있습니다
+}
+```
+
+인터페이스로 params 타입을 명시하면, 존재하지 않는 속성에 접근하거나 잘못된 타입을 사용할 때 컴파일 에러가 발생합니다.
+
+**Q3. 동적 라우트에서 데이터를 어떻게 패칭하나요?**
+
+params를 사용해 데이터베이스나 API를 호출합니다. 서버 컴포넌트에서는 직접 데이터베이스에 접근하고, 클라이언트 컴포넌트에서는 API를 호출하세요.
+
+```tsx
+// 서버 컴포넌트에서 직접 패칭
+export default async function ProductPage({ params }: { params: { id: string } }) {
+  const product = await db.products.findUnique({ where: { id: params.id } });
+  // ...
+}
+```
+
+**Q4. 중첩 레이아웃을 너무 깊게 쌓으면 성능에 문제가 생기나요?**
+
+레이아웃의 깊이 자체는 성능에 큰 영향을 주지 않습니다. App Router는 부분 렌더링을 지원하기 때문에, 상위 레이아웃은 필요한 경우에만 다시 렌더링됩니다. 다만 레이아웃 컴포넌트가 너무 많은 상태나 효과를 가지면 메모리 사용량이 증가할 수 있습니다. 실무에서는 "공통 UI의 최소 단위"로 레이아웃을 설계하는 게 좋습니다.
+
+**Q5. Route Group을 사용하지 않고 일반 폴더만으로도 충분하지 않나요?**
+
+충분할 수 있지만, Route Group은 URL 구조와 UI 구조를 분리할 수 있다는 장점이 있습니다. 예를 들어 `(shop)`과 `(blog)`를 같은 레벨에 두면 `/shop`와 `/blog` 모두 같은 도메인에 있지만, 완전히 다른 레이아웃 체계를 가질 수 있습니다. 또한 그룹을 사용하면 폴더 구조가 URL에 노출되지 않아 더 깔끔한 퍼블릭 API를 유지할 수 있습니다.
+
+**Q6. template.tsx와 layout.tsx의 차이점을 언제 활용해야 할까요?**
+
+**간단 답변:** `layout.tsx`는 React 상태까지 모두 유지하고 싶을 때, `template.tsx`는 HTML 틀만 유지하고 상태는 리셋하고 싶을 때 사용합니다.
+
+**자세한 설명:**
+
+| 상황                                                                   | 추천           | 이유                                                                |
+| ---------------------------------------------------------------------- | -------------- | ------------------------------------------------------------------- |
+| **페이지 간 상태 공유 필요**<br/>(예: 폼 입력값, 선택된 탭, 필터 상태) | `layout.tsx`   | React 컴포넌트의 상태가 유지되어 사용자가 입력한 값이 사라지지 않음 |
+| **각 페이지 독립적 상태**<br/>(예: 상품 목록 → 상품 상세 전환)         | `template.tsx` | HTML 구조는 유지되지만 React 상태는 리셋되어 각 페이지가 독립적     |
+| **대부분의 일반적인 경우**                                             | `layout.tsx`   | 90% 이상의 경우 레이아웃으로 충분하며 더 직관적임                   |
+
+**실제 사용 예시:**
+
+```jsx
+// ❌ 이렇게 하지 마세요 (template을 layout처럼 사용)
+function ShoppingCartTemplate({ children }) {
+  const [cartItems, setCartItems] = useState([]); // 매번 리셋됨!
+  return <div>{children}</div>;
+}
+
+// ✅ 이렇게 하세요 (layout 사용)
+function ShoppingCartLayout({ children }) {
+  const [cartItems, setCartItems] = useState([]); // 상태 유지됨
+  return <div>{children}</div>;
+}
+
+// ✅ 이렇게 하세요 (template 사용)
+function ProductTemplate({ children }) {
+  // 상태 없이 그냥 틀만 제공
+  return <div className="product-grid">{children}</div>;
+}
+```
+
+**결론:** 일반적인 앱에서는 `layout.tsx`로 충분합니다. `template.tsx`는 특수한 경우에만 사용하세요 - 예를 들어 "HTML 구조는 유지하되 각 페이지마다 완전히 독립적인 상태를 가져야 할 때"입니다.
+
+**Q7. 동적 라우트에서 params가 undefined일 수 있는 경우는?**
+
+대개는 Next.js의 라우팅 시스템이 보장하지만, 다음과 같은 경우에 발생할 수 있습니다:
+
+- 파일 시스템과 실제 URL이 불일치할 때
+- 빌드 시점에 동적 경로를 제대로 인식하지 못했을 때
+- 타입스크립트에서 인터페이스를 잘못 정의했을 때
+
+항상 `params.slug`처럼 옵셔널 체이닝을 사용하고, 기본값을 설정하는 게 안전합니다.
+
+## 요약
+
+- **Next.js 본질**: 파일 시스템 기반 구조와 레이아웃이 결합된 UI 설계 도구
+- **주요 강점**: 공통 레이아웃 자동 공유, 세그먼트 단위 로딩·에러 처리, 부분 렌더링 기반 스트리밍, Route Group과 template.tsx를 통한 유연한 UI 제어
+- **동적 라우팅**: `[param]`과 `[...slug]` 패턴으로 데이터 중심 URL 구조 구현, 타입 안전성과 파일 시스템 일치성 확보
+- **핵심 차이**: 리액트는 라우트 설정 라이브러리를 통해 레이아웃과 라우팅을 수동으로 연결해야 하지만, Next.js는 폴더 구조만으로 자연스럽게 중첩 레이아웃과 동적 경로를 처리한다
+
+## 참조
+
+- Next.js 공식문서 – [Creating Layouts and Pages](https://nextjs.org/learn/dashboard-app/creating-layouts-and-pages)

@@ -1,0 +1,495 @@
+---
+title: 'CWV 실전 – 폰트/이미지/서드파티 스크립트'
+publishedAt: '2025-10-04'
+summary: '폰트·이미지·스크립트 최적화로 CWV 개선'
+category: '개발'
+series: 'nextjsDocs'
+image: '/contents/posts/series/nextjsDocs/images/20.png'
+---
+
+## 들어가며
+
+지난 포스트에선 블로그에서 콘텐츠의 공식 URL을 지정하는 캐노니컬을 다뤘습니다. 이번 편에서는 페이지 로딩 성능이 검색 엔진 신뢰에 미치는 영향을 살펴보겠습니다.
+
+CWV는 Core Web Vitals의 약자로, 웹페이지의 핵심 사용자 경험 지표입니다. 구글 검색 엔진이 검색 순위를 결정할 때 사용하는 세 가지 지표를 말합니다:
+
+- **LCP**(Largest Contentful Paint): 페이지의 가장 큰 콘텐츠가 표시되는 시간
+- **FID**(First Input Delay): 사용자가 페이지와 처음 상호작용할 때의 반응 시간
+- **CLS**(Cumulative Layout Shift): 페이지 로딩 중 레이아웃이 흔들리는 정도
+
+이 지표들은 검색 엔진이 "사용자가 만족하는 페이지"를 판별하는 신호입니다. 캐노니컬이 콘텐츠의 정체성을 명확히 했다면, CWV는 사용자 체감 성능으로 검색 엔진 신뢰를 유지합니다.
+
+이번 편에서는 "랜딩 페이지 히어로 섹션 + 웹폰트 + 분석 스크립트" 시나리오를 기준으로, CSR에서 CWV를 어떻게 처리하는 한계를 보여드린 뒤 Next.js로 해결하는 패턴을 살펴보겠습니다.
+
+## CWV 최적화 전략
+
+CWV는 렌더링 시점과 자산 로딩 타이밍의 균형입니다. 폰트/이미지/서드파티가 LCP/CLS/FID에 미치는 영향을 최소화하면서 검색 엔진 신뢰를 유지합니다.
+
+### CWV의 판단 기준
+
+어떤 자산에 어떤 CWV 패턴을 적용할지 판단할 때는 사용자 체감 성능과 기술적 최적화 사이의 균형을 고려합니다. LCP는 2.5초 이내, CLS는 0.1 이하가 좋지만, 완벽한 점수를 위한 과도한 최적화는 피합니다.
+
+### Next.js의 CWV 자동화
+
+Next.js는 `next/font`, `next/image`, `next/script`로 CWV를 자동화합니다. 폰트 로딩을 최적화하고, 이미지 포맷·크기를 자동 조정하며, 서드파티 스크립트를 지연 실행합니다. `app/` 레이아웃에서 이들을 결합하면 LCP/CLS가 자연스럽게 개선됩니다.
+
+CWV는 메타데이터의 연장선입니다. 메타데이터로 페이지 정체성을 전달했다면, CWV는 사용자 체감 성능으로 검색 엔진 신뢰를 유지합니다.
+
+## 기능 구현 및 비교
+
+이번 섹션에서는 "랜딩 페이지 히어로 섹션 + 웹폰트 + 분석 스크립트" 시나리오를 기준으로, CSR에서 CWV를 어떻게 처리하는 한계를 보여드린 뒤 Next.js로 동일한 목표를 구현해보겠습니다.
+
+### 리액트 단독 – 클라이언트 렌더링 + 수동 CWV 관리
+
+CSR에서는 모든 자산 로딩을 클라이언트에서 관리합니다. 각 컴포넌트마다 수동으로 최적화합니다.
+
+```text
+src/
+├── components/
+│   ├── Hero.jsx                     // 히어로 섹션 컴포넌트
+│   ├── FontLoader.jsx               // 폰트 로딩 컴포넌트
+│   └── Analytics.jsx                // 분석 스크립트 컴포넌트
+├── pages/
+│   └── index.jsx                    // 랜딩 페이지
+└── public/
+    └── fonts/
+        └── my-font.woff2            // 웹폰트 파일
+```
+
+랜딩 페이지 히어로 섹션은 클라이언트에서 자산을 직접 로드합니다:
+
+```jsx
+// src/components/Hero.jsx
+import { useState } from "react";
+
+export function Hero() {
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  return (
+    <section className="hero">
+      <img
+        src="/hero-image.jpg"
+        alt="Hero"
+        onLoad={() => setImageLoaded(true)}
+        style={{ opacity: imageLoaded ? 1 : 0 }}
+      />
+      <h1>웰컴 투 마이 사이트</h1>
+      <p>최고의 경험을 제공합니다</p>
+    </section>
+  );
+}
+```
+
+폰트와 스크립트는 useEffect로 수동 관리합니다:
+
+```jsx
+// src/components/FontLoader.jsx
+import { useEffect } from "react";
+
+export function FontLoader() {
+  useEffect(() => {
+    const link = document.createElement("link");
+    link.href = "/fonts/my-font.woff2";
+    link.rel = "preload";
+    link.as = "font";
+    document.head.appendChild(link);
+  }, []);
+
+  return null;
+}
+```
+
+CSR의 기본 패턴입니다. useEffect로 자산을 동적 로드하고, 이미지 로딩 상태를 수동 관리합니다.
+
+### 리액트 방식의 한계
+
+CSR에서는 자산 로딩이 예측 불가능합니다. 폰트 로딩 실패로 텍스트가 튀어나오면 CLS가 악화되고, 큰 이미지가 LCP를 늦추며, 서드파티 스크립트가 FID에 영향을 줍니다. 이로 인해 검색 엔진 신뢰가 떨어집니다.
+
+### Next.js 구성 – 서버 측 CWV 제어
+
+Next.js에서는 `app/` 구조와 내장 최적화로 CWV를 서버에서 제어합니다. 히어로 섹션에 `next/image`, 레이아웃에 `next/font`와 `next/script`를 적용합니다.
+
+```text
+app/
+├── layout.tsx                    // 폰트 + 서드파티 스크립트 설정
+├── page.tsx                      // 랜딩 페이지 + 히어로 섹션
+└── components/
+    └── Hero.tsx                  // 히어로 컴포넌트 (next/image 사용)
+```
+
+랜딩 페이지 히어로 섹션은 `next/image`로 이미지를 최적화합니다:
+
+```tsx
+// app/components/Hero.tsx
+import Image from "next/image";
+
+export function Hero() {
+  return (
+    <section className="hero">
+      <Image
+        src="/hero-image.jpg"
+        alt="Hero"
+        width={1200}
+        height={800}
+        priority
+        placeholder="blur"
+        sizes="(max-width: 768px) 100vw, 50vw"
+      />
+      <h1>웰컴 투 마이 사이트</h1>
+      <p>최고의 경험을 제공합니다</p>
+    </section>
+  );
+}
+```
+
+루트 레이아웃에서 폰트와 서드파티를 설정합니다:
+
+```tsx
+// app/layout.tsx
+import { Inter } from "next/font/google";
+import Script from "next/script";
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+});
+
+export default function RootLayout({ children }: React.ReactNode) {
+  return (
+    <html lang="ko">
+      <body className={inter.className}>
+        {children}
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=GA_MEASUREMENT_ID"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'GA_MEASUREMENT_ID');
+          `}
+        </Script>
+      </body>
+    </html>
+  );
+}
+```
+
+이 구조가 CWV의 핵심입니다. 서버에서 자산을 최적화하고, 클라이언트에서는 자동으로 성능이 개선됩니다.
+
+### 리액트 vs Next.js 비교표
+
+| 구분               | 리액트 (CSR + 수동 CWV 관리)            | Next.js (서버 측 CWV 제어 + 내장 최적화) |
+| :----------------- | :-------------------------------------- | :--------------------------------------- |
+| 실행 환경 기본값   | 브라우저에서 useEffect로 자산 로드      | 서버에서 폰트/이미지 미리 준비           |
+| 데이터 접근 모델   | 클라이언트 fetch로 자산 직접 로드       | next/font/image/script로 자동 최적화     |
+| 번들 관점          | 자산 로딩 로직이 클라이언트 번들에 포함 | 내장 최적화로 번들 영향 최소             |
+| 컴포넌트 분리 의미 | 자산 로딩 로직이 비즈니스와 결합        | 정적/동적 자산으로 관심사 분리           |
+| 설계의 제약        | CWV 품질이 개발자 역량에 달려           | 내장 API로 타입 안전한 CWV 자동화        |
+
+## CWV의 트레이드오프
+
+### 장점
+
+- **검색 순위 상승**: LCP/CLS 개선으로 검색 엔진 순위에 직접적 긍정 영향
+- **사용자 경험 향상**: 빠른 로딩으로 체감 성능 개선, 특히 모바일 환경에서 효과적
+- **자동 최적화**: Next.js 내장 도구로 복잡한 수동 최적화 없이 높은 CWV 점수 달성
+
+### 단점
+
+- **우선순위 설정 어려움**: LCP에 영향을 주는 자산을 정확히 식별하기 어려움
+- **서드파티 스크립트 관리**: 외부 스크립트 로딩 전략이 복잡함
+- **반응형 이미지 복잡성**: 다양한 디바이스에 최적화된 이미지 크기 계산 어려움
+
+### 균형 맞추기 팁
+
+LCP에 직접 영향을 주는 이미지에만 `priority`를 적용하고, 폰트는 필요한 subsets만 로드하세요. `next/script`로 서드파티 스크립트를 적절히 지연시키고, `next/image`의 `sizes` 속성으로 반응형 최적화를 활용하세요.
+
+### 예상 질문
+
+**Q1. CSR에서 이미지 lazy loading은 어떻게 하나요?**
+
+클라이언트에서 `IntersectionObserver`로 이미지 로딩을 지연시킬 수 있지만, LCP에 영향을 주는 이미지에서는 효과적이지 않습니다. Next.js에서는 `next/image`가 자동으로 lazy loading을 적용하며, `priority`로 LCP 이미지를 예외 처리합니다.
+
+**Q2. next/font와 일반 CSS @font-face는 어떻게 다르나요?**
+
+`next/font`는 폰트를 자동으로 호스팅하고 최적화하며, `display: swap`으로 CLS를 방지합니다. 일반 CSS에서는 수동으로 preload를 추가해야 합니다.
+
+**Q3. 서드파티 스크립트가 많으면 어떻게 하나요?**
+
+`next/script`의 `strategy`를 `lazyOnload`로 설정해 실행을 지연시키세요. 필수적인 스크립트만 남기고 불필요한 것은 제거하는 게 좋습니다.
+
+**Q4. CWV 점수가 검색 순위에 언제 반영되나요?**
+
+크롤링 주기에 따라 다르지만, 일반적으로 1-2주가 걸릴 수 있습니다. PageSpeed Insights나 Lighthouse로 현황을 확인하세요.
+
+**Q5. next/image가 자동으로 WebP로 변환하나요?**
+
+네, 브라우저 지원에 따라 자동으로 WebP/AVIF로 변환합니다. 파일 크기를 25-35% 줄여 LCP를 개선합니다.
+
+## 요약
+
+이번 편에서는 캐노니컬 이후의 다음 단계로 CWV를 다뤘습니다. CSR에서는 클라이언트에서 자산을 수동 관리해 성능이 불안정했지만, Next.js에서는 `next/font`, `next/image`, `next/script`로 서버 측에서 CWV를 제어합니다.
+
+핵심은 자산 로딩 타이밍과 사용자 체감 사이의 균형입니다. LCP 우선 이미지로 빠른 콘텐츠 표시를, CLS 방지 폰트로 레이아웃 안정성을, 지연 서드파티 스크립트로 상호작용 반응성을 유지합니다.
+
+이를 통해 LCP 개선, CLS 안정화, FID 최적화가 이루어지며, 검색 엔진 신뢰가 유지됩니다.
+
+## 참조
+
+- Next.js 공식문서
+
+  - [Web Performance](https://nextjs.org/learn/seo/web-performance)
+  - [Optimizing Fonts](https://nextjs.org/learn/seo/fonts)
+  - [Automatic Image Optimization](https://nextjs.org/learn/seo/images)
+  - [Optimizing Third-Party Scripts](https://nextjs.org/learn/seo/third-party-scripts)
+  - [Core Web Vitals](https://web.dev/vitals/)
+  - [Optimizing Fonts (Docs)](https://nextjs.org/docs/app/building-your-application/optimizing/fonts)
+  - [Image Component (Docs)](https://nextjs.org/docs/app/api-reference/components/image)
+  - [Script Component (Docs)](https://nextjs.org/docs/app/api-reference/components/script)
+# 5-5편: CWV 실전 – 폰트/이미지/서드파티 스크립트
+
+## 들어가며
+
+지난 포스트에선 블로그에서 콘텐츠의 공식 URL을 지정하는 캐노니컬을 다뤘습니다. 이번 편에서는 페이지 로딩 성능이 검색 엔진 신뢰에 미치는 영향을 살펴보겠습니다.
+
+CWV는 Core Web Vitals의 약자로, 웹페이지의 핵심 사용자 경험 지표입니다. 구글 검색 엔진이 검색 순위를 결정할 때 사용하는 세 가지 지표를 말합니다:
+
+- **LCP**(Largest Contentful Paint): 페이지의 가장 큰 콘텐츠가 표시되는 시간
+- **FID**(First Input Delay): 사용자가 페이지와 처음 상호작용할 때의 반응 시간
+- **CLS**(Cumulative Layout Shift): 페이지 로딩 중 레이아웃이 흔들리는 정도
+
+이 지표들은 검색 엔진이 "사용자가 만족하는 페이지"를 판별하는 신호입니다. 캐노니컬이 콘텐츠의 정체성을 명확히 했다면, CWV는 사용자 체감 성능으로 검색 엔진 신뢰를 유지합니다.
+
+이번 편에서는 "랜딩 페이지 히어로 섹션 + 웹폰트 + 분석 스크립트" 시나리오를 기준으로, CSR에서 CWV를 어떻게 처리하는 한계를 보여드린 뒤 Next.js로 해결하는 패턴을 살펴보겠습니다.
+
+## CWV 최적화 전략
+
+CWV는 렌더링 시점과 자산 로딩 타이밍의 균형입니다. 폰트/이미지/서드파티가 LCP/CLS/FID에 미치는 영향을 최소화하면서 검색 엔진 신뢰를 유지합니다.
+
+### CWV의 판단 기준
+
+어떤 자산에 어떤 CWV 패턴을 적용할지 판단할 때는 사용자 체감 성능과 기술적 최적화 사이의 균형을 고려합니다. LCP는 2.5초 이내, CLS는 0.1 이하가 좋지만, 완벽한 점수를 위한 과도한 최적화는 피합니다.
+
+### Next.js의 CWV 자동화
+
+Next.js는 `next/font`, `next/image`, `next/script`로 CWV를 자동화합니다. 폰트 로딩을 최적화하고, 이미지 포맷·크기를 자동 조정하며, 서드파티 스크립트를 지연 실행합니다. `app/` 레이아웃에서 이들을 결합하면 LCP/CLS가 자연스럽게 개선됩니다.
+
+CWV는 메타데이터의 연장선입니다. 메타데이터로 페이지 정체성을 전달했다면, CWV는 사용자 체감 성능으로 검색 엔진 신뢰를 유지합니다.
+
+## 기능 구현 및 비교
+
+이번 섹션에서는 "랜딩 페이지 히어로 섹션 + 웹폰트 + 분석 스크립트" 시나리오를 기준으로, CSR에서 CWV를 어떻게 처리하는 한계를 보여드린 뒤 Next.js로 동일한 목표를 구현해보겠습니다.
+
+### 리액트 단독 – 클라이언트 렌더링 + 수동 CWV 관리
+
+CSR에서는 모든 자산 로딩을 클라이언트에서 관리합니다. 각 컴포넌트마다 수동으로 최적화합니다.
+
+```text
+src/
+├── components/
+│   ├── Hero.jsx                     // 히어로 섹션 컴포넌트
+│   ├── FontLoader.jsx               // 폰트 로딩 컴포넌트
+│   └── Analytics.jsx                // 분석 스크립트 컴포넌트
+├── pages/
+│   └── index.jsx                    // 랜딩 페이지
+└── public/
+    └── fonts/
+        └── my-font.woff2            // 웹폰트 파일
+```
+
+랜딩 페이지 히어로 섹션은 클라이언트에서 자산을 직접 로드합니다:
+
+```jsx
+// src/components/Hero.jsx
+import { useState } from "react";
+
+export function Hero() {
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  return (
+    <section className="hero">
+      <img
+        src="/hero-image.jpg"
+        alt="Hero"
+        onLoad={() => setImageLoaded(true)}
+        style={{ opacity: imageLoaded ? 1 : 0 }}
+      />
+      <h1>웰컴 투 마이 사이트</h1>
+      <p>최고의 경험을 제공합니다</p>
+    </section>
+  );
+}
+```
+
+폰트와 스크립트는 useEffect로 수동 관리합니다:
+
+```jsx
+// src/components/FontLoader.jsx
+import { useEffect } from "react";
+
+export function FontLoader() {
+  useEffect(() => {
+    const link = document.createElement("link");
+    link.href = "/fonts/my-font.woff2";
+    link.rel = "preload";
+    link.as = "font";
+    document.head.appendChild(link);
+  }, []);
+
+  return null;
+}
+```
+
+CSR의 기본 패턴입니다. useEffect로 자산을 동적 로드하고, 이미지 로딩 상태를 수동 관리합니다.
+
+### 리액트 방식의 한계
+
+CSR에서는 자산 로딩이 예측 불가능합니다. 폰트 로딩 실패로 텍스트가 튀어나오면 CLS가 악화되고, 큰 이미지가 LCP를 늦추며, 서드파티 스크립트가 FID에 영향을 줍니다. 이로 인해 검색 엔진 신뢰가 떨어집니다.
+
+### Next.js 구성 – 서버 측 CWV 제어
+
+Next.js에서는 `app/` 구조와 내장 최적화로 CWV를 서버에서 제어합니다. 히어로 섹션에 `next/image`, 레이아웃에 `next/font`와 `next/script`를 적용합니다.
+
+```text
+app/
+├── layout.tsx                    // 폰트 + 서드파티 스크립트 설정
+├── page.tsx                      // 랜딩 페이지 + 히어로 섹션
+└── components/
+    └── Hero.tsx                  // 히어로 컴포넌트 (next/image 사용)
+```
+
+랜딩 페이지 히어로 섹션은 `next/image`로 이미지를 최적화합니다:
+
+```tsx
+// app/components/Hero.tsx
+import Image from "next/image";
+
+export function Hero() {
+  return (
+    <section className="hero">
+      <Image
+        src="/hero-image.jpg"
+        alt="Hero"
+        width={1200}
+        height={800}
+        priority
+        placeholder="blur"
+        sizes="(max-width: 768px) 100vw, 50vw"
+      />
+      <h1>웰컴 투 마이 사이트</h1>
+      <p>최고의 경험을 제공합니다</p>
+    </section>
+  );
+}
+```
+
+루트 레이아웃에서 폰트와 서드파티를 설정합니다:
+
+```tsx
+// app/layout.tsx
+import { Inter } from "next/font/google";
+import Script from "next/script";
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+});
+
+export default function RootLayout({ children }: React.ReactNode) {
+  return (
+    <html lang="ko">
+      <body className={inter.className}>
+        {children}
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=GA_MEASUREMENT_ID"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'GA_MEASUREMENT_ID');
+          `}
+        </Script>
+      </body>
+    </html>
+  );
+}
+```
+
+이 구조가 CWV의 핵심입니다. 서버에서 자산을 최적화하고, 클라이언트에서는 자동으로 성능이 개선됩니다.
+
+### 리액트 vs Next.js 비교표
+
+| 구분               | 리액트 (CSR + 수동 CWV 관리)            | Next.js (서버 측 CWV 제어 + 내장 최적화) |
+| :----------------- | :-------------------------------------- | :--------------------------------------- |
+| 실행 환경 기본값   | 브라우저에서 useEffect로 자산 로드      | 서버에서 폰트/이미지 미리 준비           |
+| 데이터 접근 모델   | 클라이언트 fetch로 자산 직접 로드       | next/font/image/script로 자동 최적화     |
+| 번들 관점          | 자산 로딩 로직이 클라이언트 번들에 포함 | 내장 최적화로 번들 영향 최소             |
+| 컴포넌트 분리 의미 | 자산 로딩 로직이 비즈니스와 결합        | 정적/동적 자산으로 관심사 분리           |
+| 설계의 제약        | CWV 품질이 개발자 역량에 달려           | 내장 API로 타입 안전한 CWV 자동화        |
+
+## CWV의 트레이드오프
+
+### 장점
+
+- **검색 순위 상승**: LCP/CLS 개선으로 검색 엔진 순위에 직접적 긍정 영향
+- **사용자 경험 향상**: 빠른 로딩으로 체감 성능 개선, 특히 모바일 환경에서 효과적
+- **자동 최적화**: Next.js 내장 도구로 복잡한 수동 최적화 없이 높은 CWV 점수 달성
+
+### 단점
+
+- **우선순위 설정 어려움**: LCP에 영향을 주는 자산을 정확히 식별하기 어려움
+- **서드파티 스크립트 관리**: 외부 스크립트 로딩 전략이 복잡함
+- **반응형 이미지 복잡성**: 다양한 디바이스에 최적화된 이미지 크기 계산 어려움
+
+### 균형 맞추기 팁
+
+LCP에 직접 영향을 주는 이미지에만 `priority`를 적용하고, 폰트는 필요한 subsets만 로드하세요. `next/script`로 서드파티 스크립트를 적절히 지연시키고, `next/image`의 `sizes` 속성으로 반응형 최적화를 활용하세요.
+
+### 예상 질문
+
+**Q1. CSR에서 이미지 lazy loading은 어떻게 하나요?**
+
+클라이언트에서 `IntersectionObserver`로 이미지 로딩을 지연시킬 수 있지만, LCP에 영향을 주는 이미지에서는 효과적이지 않습니다. Next.js에서는 `next/image`가 자동으로 lazy loading을 적용하며, `priority`로 LCP 이미지를 예외 처리합니다.
+
+**Q2. next/font와 일반 CSS @font-face는 어떻게 다르나요?**
+
+`next/font`는 폰트를 자동으로 호스팅하고 최적화하며, `display: swap`으로 CLS를 방지합니다. 일반 CSS에서는 수동으로 preload를 추가해야 합니다.
+
+**Q3. 서드파티 스크립트가 많으면 어떻게 하나요?**
+
+`next/script`의 `strategy`를 `lazyOnload`로 설정해 실행을 지연시키세요. 필수적인 스크립트만 남기고 불필요한 것은 제거하는 게 좋습니다.
+
+**Q4. CWV 점수가 검색 순위에 언제 반영되나요?**
+
+크롤링 주기에 따라 다르지만, 일반적으로 1-2주가 걸릴 수 있습니다. PageSpeed Insights나 Lighthouse로 현황을 확인하세요.
+
+**Q5. next/image가 자동으로 WebP로 변환하나요?**
+
+네, 브라우저 지원에 따라 자동으로 WebP/AVIF로 변환합니다. 파일 크기를 25-35% 줄여 LCP를 개선합니다.
+
+## 요약
+
+이번 편에서는 캐노니컬 이후의 다음 단계로 CWV를 다뤘습니다. CSR에서는 클라이언트에서 자산을 수동 관리해 성능이 불안정했지만, Next.js에서는 `next/font`, `next/image`, `next/script`로 서버 측에서 CWV를 제어합니다.
+
+핵심은 자산 로딩 타이밍과 사용자 체감 사이의 균형입니다. LCP 우선 이미지로 빠른 콘텐츠 표시를, CLS 방지 폰트로 레이아웃 안정성을, 지연 서드파티 스크립트로 상호작용 반응성을 유지합니다.
+
+이를 통해 LCP 개선, CLS 안정화, FID 최적화가 이루어지며, 검색 엔진 신뢰가 유지됩니다.
+
+## 참조
+
+- Next.js 공식문서
+
+  - [Web Performance](https://nextjs.org/learn/seo/web-performance)
+  - [Optimizing Fonts](https://nextjs.org/learn/seo/fonts)
+  - [Automatic Image Optimization](https://nextjs.org/learn/seo/images)
+  - [Optimizing Third-Party Scripts](https://nextjs.org/learn/seo/third-party-scripts)
+  - [Core Web Vitals](https://web.dev/vitals/)
+  - [Optimizing Fonts (Docs)](https://nextjs.org/docs/app/building-your-application/optimizing/fonts)
+  - [Image Component (Docs)](https://nextjs.org/docs/app/api-reference/components/image)
+  - [Script Component (Docs)](https://nextjs.org/docs/app/api-reference/components/script)
