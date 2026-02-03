@@ -39,9 +39,6 @@ export const metadata: Metadata = {
     description: blogMeta.description,
     images: ['/twitter-image'],
   },
-  icons: {
-    icon: '/favicon.ico',
-  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
