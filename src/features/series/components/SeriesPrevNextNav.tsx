@@ -1,9 +1,9 @@
 import Link from 'next/link';
-import { PostWithCategory } from '@/lib/post';
+import type { PostSummary } from '@/lib/post';
 
 type SeriesPrevNextNavProps = {
   currentPostSlug: string;
-  seriesPosts: PostWithCategory[];
+  seriesPosts: PostSummary[];
   seriesName: string;
 };
 
@@ -40,7 +40,7 @@ export default function SeriesPrevNextNav({
 }
 
 type SeriesNavItemProps = {
-  post: PostWithCategory;
+  post: PostSummary;
   variant: 'prev' | 'next';
   seriesNumber: number;
 };

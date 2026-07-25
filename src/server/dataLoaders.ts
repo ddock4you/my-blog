@@ -1,10 +1,10 @@
 import 'server-only';
 
 import {
-  getBlogPosts,
+  getPostSummaries,
   getAllSeries,
   getPostsBySeriesName,
-  type PostWithCategory,
+  type PostSummary,
   type SeriesInfo,
 } from '@/lib/post';
 import { findSeriesKey, getSeriesOrder } from '@/lib/series';
@@ -23,11 +23,11 @@ export async function loadHomeInitialData({
   mode,
   pageSize = DEFAULT_PAGE_SIZE,
 }: HomeInitialParams): Promise<{
-  items: PostWithCategory[];
+  items: PostSummary[];
   total: number;
   initialPage: number;
 }> {
-  const allPosts = getBlogPosts().sort((a, b) => {
+  const allPosts = getPostSummaries().sort((a, b) => {
     if (new Date(a.metadata.publishedAt) > new Date(b.metadata.publishedAt)) return -1;
     return 1;
   });
@@ -76,7 +76,7 @@ export async function loadSeriesPostInitialData({
   mode,
   pageSize = DEFAULT_PAGE_SIZE,
 }: SeriesDetailInitialParams): Promise<{
-  items: PostWithCategory[];
+  items: PostSummary[];
   total: number;
   initialPage: number;
 }> {

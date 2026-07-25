@@ -1,19 +1,11 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import { IBM_Plex_Sans_KR } from 'next/font/google';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
-import { SearchProvider } from '@/contexts/SearchContext';
-import { generateSearchData } from '@/lib/post';
 import './globals.css';
 import { blogMeta } from '@/data/blogMeta';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import AnalyticsLoader from '@/components/AnalyticsLoader';
-
-const ibmPlexSansKr = IBM_Plex_Sans_KR({
-  subsets: ['latin-ext'],
-  weight: ['400', '600', '700'],
-});
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || blogMeta.canonical),
@@ -42,11 +34,24 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  // 서버 사이드에서 검색 데이터 생성
-  const searchData = generateSearchData();
-
   return (
-    <html lang="ko" className={ibmPlexSansKr.className} suppressHydrationWarning>
+    <html lang="ko" suppressHydrationWarning>
+      <head>
+        <link
+          rel="preload"
+          href="/fonts/ibm-plex-sans-kr/IBMPlexSansKR-Regular-92.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="preload"
+          href="/fonts/ibm-plex-sans-kr/IBMPlexSansKR-SemiBold-92.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
+      </head>
       <body
         className="font-ibm bg-bg-inverse-white box-sizing-border-box flex min-h-screen flex-col
           antialiased"
@@ -58,14 +63,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
         <ThemeProvider>
-          <SearchProvider searchData={searchData}>
-            <div className="mx-auto w-full max-w-3xl">
-              <Header />
-              <main className="px-7 md:px-10">{children}</main>
-              <Footer />
-            </div>
-          </SearchProvider>
+          <div className="mx-auto w-full max-w-3xl">
+            <Header />
+            <main className="px-7 md:px-10">{children}</main>
+            <Footer />
+          </div>
         </ThemeProvider>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(() => { const load = () => { if (document.querySelector('link[data-ibm-plex-deferred]')) return; const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = '/fonts/ibm-plex-sans-kr/ibm-plex-sans-kr.css'; link.dataset.ibmPlexDeferred = ''; document.head.appendChild(link); }; const onVisibility = () => { if (document.visibilityState !== 'hidden') return; load(); document.removeEventListener('visibilitychange', onVisibility); }; document.addEventListener('visibilitychange', onVisibility); window.addEventListener('pagehide', load, { once: true }); })();`,
+          }}
+        />
         <AnalyticsLoader />
       </body>
     </html>

@@ -1,13 +1,13 @@
 'use client';
 import Link from 'next/link';
-import { PostWithCategory } from '@/lib/post';
+import type { SearchIndexItem } from '@/lib/post';
 import { cn, formatDate, formatReadingTime } from '@/lib/utils';
 import { Calendar, Clock } from 'lucide-react';
 import { Fragment, ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 
 type SearchedPostProps = {
-  post: PostWithCategory & { seriesIndex?: number; seriesTitle?: string };
+  post: SearchIndexItem;
   highlightQuery?: string;
   onClick?: () => void;
   className?: string;
@@ -72,15 +72,15 @@ function SearchedPost({ post, highlightQuery, onClick, className }: SearchedPost
           </div>
         </div>
         <p className="line-clamp-1 font-bold sm:text-lg">
-          {highlightToNode(post.metadata.title, highlightQuery)}
+          {highlightToNode(post.title, highlightQuery)}
         </p>
         <p className="line-clamp-2 max-h-10 text-sm sm:max-h-12 sm:text-base">
-          {highlightToNode(post.metadata.summary, highlightQuery)}
+          {highlightToNode(post.summary, highlightQuery)}
         </p>
         <div className="flex items-center gap-3 text-sm sm:gap-4 sm:text-base">
           <div className="flex items-center">
             <Calendar className="text-border-primary mr-2 h-4.5 w-4.5" />
-            <span className="text-text-primary">{formatDate(post.metadata.publishedAt)}</span>
+            <span className="text-text-primary">{formatDate(post.publishedAt)}</span>
           </div>
           <div className="flex items-center">
             <Clock className="text-border-primary mr-2 h-4.5 w-4.5" />

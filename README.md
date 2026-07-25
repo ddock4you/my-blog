@@ -57,7 +57,8 @@ pnpm lint
 NEXT_PUBLIC_SITE_URL=https://example.com
 
 # Google Analytics/GTM (값이 있으면 로더가 GA+GTM을 함께 주입)
-NEXT_PUBLIC_GA_ID=
+NEXT_PUBLIC_GA_MEASUREMENT_ID=
+NEXT_PUBLIC_GTM_ID=
 
 # Giscus (댓글)
 NEXT_PUBLIC_GISCUS_REPO_NAME=
@@ -121,11 +122,11 @@ image: /contents/posts/<slug>/images/cover.png
 
 ### API
 
-- `GET /api/posts?category=&page=`  
+- `GET /api/posts?category=&page=`
   - 헤더 `x-page-size`로 pageSize 제어(기본 10)
-- `GET /api/series?page=`  
+- `GET /api/series?page=`
   - 헤더 `x-page-size`로 pageSize 제어(기본 10)
-- `GET /api/series/[slug]?page=&mode=`  
+- `GET /api/series/[slug]?page=&mode=`
   - `mode`: `cumulative`(누적) | `single`(페이지 단위)
   - 헤더 `x-page-size`로 pageSize 제어(기본 10)
 

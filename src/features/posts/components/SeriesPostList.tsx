@@ -4,12 +4,12 @@ import { useMemo } from 'react';
 import { useLoadMorePagination } from '@/hooks/useLoadMorePagination';
 import { Button } from '@/components/ui/button';
 import SeriesPostCard from '@/features/posts/components/SeriesPostCard';
-import type { PostWithCategory } from '@/lib/post';
+import type { PostSummary } from '@/lib/post';
 
 type Props = {
   slug: string;
   initialPage: number;
-  initialData: { items: PostWithCategory[]; total: number; initialPageHydrated?: number };
+  initialData: { items: PostSummary[]; total: number; initialPageHydrated?: number };
 };
 
 export default function SeriesPostList({ slug, initialPage, initialData }: Props) {
@@ -22,7 +22,7 @@ export default function SeriesPostList({ slug, initialPage, initialData }: Props
   );
 
   const { items, page, totalPages, hasMore, isLoading, loadMore } =
-    useLoadMorePagination<PostWithCategory>({
+    useLoadMorePagination<PostSummary>({
       fetchPage: fetcher,
       initialPage,
       initialData,

@@ -5,17 +5,10 @@ const nextConfig: NextConfig = {
   pageExtensions: ['js', 'jsx', 'md', 'mdx', 'ts', 'tsx'],
   // Optionally, add any other Next.js config below
   images: {
-    deviceSizes: [160, 480, 768],
-    imageSizes: [320, 480, 768],
-    formats: ['image/avif', 'image/webp'],
-  },
-  async rewrites() {
-    return [
-      {
-        source: '/contents/:path*',
-        destination: '/api/contents/:path*',
-      },
-    ];
+    deviceSizes: [320, 360, 480, 640, 768],
+    imageSizes: [160, 240],
+    formats: ['image/webp'],
+    qualities: [30, 75],
   },
 };
 

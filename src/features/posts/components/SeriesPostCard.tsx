@@ -1,18 +1,10 @@
 'use client';
 import Link from 'next/link';
-import { PostWithCategory } from '@/lib/post';
+import type { PostSummary } from '@/lib/post';
 import { formatDate, formatReadingTime } from '@/lib/utils';
 import { Calendar, Clock } from 'lucide-react';
 
-function SeriesPostCard({
-  post,
-  idx,
-  count,
-}: {
-  post: PostWithCategory;
-  idx: number;
-  count: number;
-}) {
+function SeriesPostCard({ post, idx, count }: { post: PostSummary; idx: number; count: number }) {
   return (
     <Link href={`/posts/${post.slug}`} className="flex flex-col gap-2">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">

@@ -1,15 +1,20 @@
 'use client';
 
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { useState, useCallback, memo } from 'react';
 import { Sun, Moon, Search } from 'lucide-react';
-import { SearchModal } from '@/features/search/components/SearchModal';
 import { useTheme } from '@/hooks/useTheme';
 import clsx from 'clsx';
 
+const SearchModal = dynamic(
+  () => import('@/features/search/components/SearchModal').then(module => module.SearchModal),
+  { ssr: false }
+);
+
 export function Header() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const { isDarkMode, toggleDarkMode } = useTheme();
+  const { toggleDarkMode } = useTheme();
 
   const openSearch = useCallback(() => {
     setIsSearchOpen(true);
@@ -29,15 +34,10 @@ export function Header() {
       >
         <div className="flex h-full items-center justify-between">
           <Logo />
-          <Navigation
-            openSearch={openSearch}
-            toggleDarkMode={toggleDarkMode}
-            isDarkMode={isDarkMode}
-          />
+          <Navigation openSearch={openSearch} toggleDarkMode={toggleDarkMode} />
         </div>
       </header>
-      {/* 검색 모달 */}
-      <SearchModal isOpen={isSearchOpen} onClose={closeSearch} />
+      {isSearchOpen && <SearchModal isOpen onClose={closeSearch} />}
     </>
   );
 }
@@ -45,7 +45,7 @@ export function Header() {
 function Logo() {
   return (
     <Link href="/" className="text-text-primary flex flex-col gap-2 text-right">
-      <span className="text-xl font-bold md:text-3xl">Dev Thinking</span>
+      <span className="font-logo text-xl [font-weight:700] md:text-3xl">Dev Thinking</span>
     </Link>
   );
 }
@@ -53,11 +53,9 @@ function Logo() {
 const Navigation = memo(function Navigation({
   openSearch,
   toggleDarkMode,
-  isDarkMode,
 }: {
   openSearch: () => void;
   toggleDarkMode: () => void;
-  isDarkMode: boolean;
 }) {
   return (
     <nav className="flex items-center gap-5 text-sm">
@@ -69,9 +67,13 @@ const Navigation = memo(function Navigation({
         <Search className="text-text-primary h-5 w-5" />
         <span className="text-text-primary text-sm font-semibold tracking-tight">검색하기</span>
       </button>
-      <button onClick={toggleDarkMode} className="cursor-pointer" aria-label="다크모드 토글">
-        {!isDarkMode && <Sun className="text-text-primary h-5 w-5" />}
-        {isDarkMode && <Moon className="text-text-primary h-5 w-5" />}
+      <button
+        onClick={toggleDarkMode}
+        className="relative h-5 w-5 cursor-pointer"
+        aria-label="다크모드 토글"
+      >
+        <Sun className="text-text-primary absolute inset-0 h-5 w-5 dark:hidden" />
+        <Moon className="text-text-primary absolute inset-0 hidden h-5 w-5 dark:block" />
       </button>
     </nav>
   );

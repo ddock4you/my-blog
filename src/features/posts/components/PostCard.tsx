@@ -1,21 +1,31 @@
-'use client';
-import { memo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { PostWithCategory } from '@/lib/post';
+import type { PostSummary } from '@/lib/post';
 import { formatDate, formatReadingTime } from '@/lib/utils';
 import { Calendar, Clock } from 'lucide-react';
 
-function PostCard({ post }: { post: PostWithCategory }) {
+export default function PostCard({
+  post,
+  imagePriority = false,
+}: {
+  post: PostSummary;
+  imagePriority?: boolean;
+}) {
+  const cardImage = post.metadata.cardImage || post.image || '';
+
   return (
     <Link className="flex flex-col gap-5 sm:flex-row sm:gap-5" href={`/posts/${post.slug}`}>
       <p className="relative aspect-square flex-shrink-0 sm:w-40">
         <Image
-          src={post.image || ''}
+          src={cardImage}
           alt={`${post.metadata.title} 썸네일`}
           fill
+          quality={post.metadata.cardImage ? undefined : 30}
+          unoptimized={Boolean(post.metadata.cardImage)}
           className="bg-bg-inverse-white object-cover"
-          sizes="(max-width: 640px) 640px, 160px"
+          sizes="(max-width: 640px) calc(100vw - 3.5rem), 160px"
+          loading={imagePriority ? 'eager' : 'lazy'}
+          fetchPriority={imagePriority ? 'high' : 'auto'}
         />
       </p>
       <div className="text-text-primary flex flex-col gap-4 sm:justify-center sm:gap-3">
@@ -37,5 +47,3 @@ function PostCard({ post }: { post: PostWithCategory }) {
     </Link>
   );
 }
-
-export default memo(PostCard);

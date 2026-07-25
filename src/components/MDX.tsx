@@ -1,12 +1,12 @@
 /* eslint-disable */
 // @ts-nocheck
 import Link from 'next/link';
-import Image from 'next/image';
 import { MDXRemote } from 'next-mdx-remote/rsc';
 import rehypePrettyCode from 'rehype-pretty-code';
 import rehypeSlug from 'rehype-slug';
 import remarkGfm from 'remark-gfm';
 import React from 'react';
+import { MdxImage } from '@/components/MdxImage';
 
 function Table({ data }: { data: { headers: string[]; rows: string[][] } }) {
   const headers = data.headers.map((header, index) => <th key={index}>{header}</th>);
@@ -46,17 +46,14 @@ function CustomLink(props: any) {
   return <a target="_blank" rel="noopener noreferrer" {...props} />;
 }
 
-function RoundedImage(props: any) {
-  return <Image alt={props.alt} className="rounded-lg" {...props} />;
-}
-
 function Code({ children, ...props }) {
   // shiki 기반 구문 강조를 위해 기본 code 태그 사용
   return <code {...props}>{children}</code>;
 }
 
 const components = {
-  Image: RoundedImage,
+  Image: MdxImage,
+  img: MdxImage,
   a: CustomLink,
   code: Code,
   Table,

@@ -1,7 +1,8 @@
 /* Tailwind CSS를 가져오기 */
-@import "tailwindcss";
+@import 'tailwindcss';
+@import './ibm-plex-sans-kr-critical.css';
 /* tw-animate-css 애니메이션 라이브러리 가져오기 */
-@import "tw-animate-css";
+@import 'tw-animate-css';
 /* Tailwind CSS 플러그인 등록 */
 @plugin "@tailwindcss/typography";
 
@@ -9,7 +10,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @custom-variant prose-inline-code {
-  &.prose :where(:not(pre)>code):not(:where([class~="not-prose"] *)) {
+  &.prose :where(:not(pre) > code):not(:where([class~='not-prose'] *)) {
     @slot;
   }
 }
@@ -17,7 +18,8 @@
 /* Tailwind CSS 테마 설정 - CSS 변수들을 정의하여 Tailwind 클래스에서 사용할 수 있게 함 */
 @theme inline {
   --font-ibm: var(--font-ibm-plex-sans-kr);
-
+  --font-logo: var(--font-ibm-plex-logo);
+  --font-weight-bold: 600;
 
   /* figma 변수 추가 */
   --color-brand-50: var(--color-brand-50);
@@ -32,14 +34,13 @@
   --color-brand-900: var(--color-brand-900);
   --color-brand-950: var(--color-brand-950);
 
-
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
   --color-text-tertiary: var(--text-tertiary);
   --color-text-disabled: var(--text-disabled);
   --color-text-inverse-black: var(--text-inverse-black);
   --color-text-inverse-white: var(--text-inverse-white);
-  
+
   --color-border-primary: var(--border-primary);
   --color-border-secondary: var(--border-secondary);
   --color-border-tertiary: var(--border-tertiary);
@@ -67,20 +68,23 @@
 @layer base {
   /* 루트 요소 (라이트 모드)에 대한 CSS 변수 정의 */
   :root {
+    --font-ibm-plex-sans-kr:
+      'IBM Plex Sans KR', 'Malgun Gothic', 'Apple SD Gothic Neo', system-ui, sans-serif;
+    --font-ibm-plex-logo: 'IBM Plex Sans KR Logo', 'IBM Plex Sans KR', system-ui, sans-serif;
     /* figma 변수 추가 */
-    --color-brand-50: #F5F5F5;
-    --color-brand-100: #E3E3E3;
-    --color-brand-200: #D0D0D0;
-    --color-brand-300: #B9B9B9;
-    --color-brand-400: #A1A1A1;
-    --color-brand-500: #8A8A8A;
+    --color-brand-50: #f5f5f5;
+    --color-brand-100: #e3e3e3;
+    --color-brand-200: #d0d0d0;
+    --color-brand-300: #b9b9b9;
+    --color-brand-400: #a1a1a1;
+    --color-brand-500: #8a8a8a;
     --color-brand-600: #727272;
     --color-brand-700: #575757;
     --color-brand-800: #444444;
     --color-brand-900: #2d2d2d;
     --color-brand-950: #151515;
     --color-mono-black: #000000;
-    --color-mono-white: #FFFFFF;
+    --color-mono-white: #ffffff;
 
     --text-primary: var(--color-brand-950);
     --text-secondary: var(--color-brand-600);
@@ -145,17 +149,14 @@
   }
 }
 
-
-
-
 /* 인라인 code의 가짜 백틱 제거 (typography 기본 장식 끄기) */
-.prose :where(:not(pre)>code):not(:where([class~="not-prose"] *))::before,
-.prose :where(:not(pre)>code):not(:where([class~="not-prose"] *))::after {
+.prose :where(:not(pre) > code):not(:where([class~='not-prose'] *))::before,
+.prose :where(:not(pre) > code):not(:where([class~='not-prose'] *))::after {
   content: none;
 }
 
 /* 인라인 code 가독성 스타일 */
-.prose :where(:not(pre)>code):not(:where([class~="not-prose"] *)) {
+.prose :where(:not(pre) > code):not(:where([class~='not-prose'] *)) {
   background: var(--color-bg-tertiary);
   border: 1px solid var(--color-border-tertiary);
   border-radius: 0.25rem;
@@ -164,7 +165,7 @@
 }
 
 /* 다크 모드에서도 동일 변수 사용 (변수는 다크에서 전환됨) */
-.dark .prose :where(:not(pre)>code):not(:where([class~="not-prose"] *)) {
+.dark .prose :where(:not(pre) > code):not(:where([class~='not-prose'] *)) {
   background: var(--color-bg-tertiary);
   border-color: var(--color-border-tertiary);
 }

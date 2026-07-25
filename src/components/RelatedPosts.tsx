@@ -1,10 +1,10 @@
 import Link from 'next/link';
 import { Calendar, ArrowRight } from 'lucide-react';
-import { getPostsByCategory, PostWithCategory } from '@/lib/post';
+import { getPostsByCategory, type PostDocument } from '@/lib/post';
 import { formatDate } from '@/lib/utils';
 
 interface RelatedPostsProps {
-  currentPost: PostWithCategory;
+  currentPost: PostDocument;
   maxPosts?: number;
 }
 

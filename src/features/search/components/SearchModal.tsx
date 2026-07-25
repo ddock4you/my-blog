@@ -1,11 +1,37 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Search, X, Loader2 } from 'lucide-react';
 import { SearchResult, useSearch } from '@/features/search/hooks/useSearch';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import SearchedPost from '@/features/search/components/SearchedPost';
+import type { SearchIndexItem } from '@/lib/post';
+
+let cachedSearchIndex: SearchIndexItem[] | null = null;
+let searchIndexRequest: Promise<SearchIndexItem[]> | null = null;
+
+function loadSearchIndex({ retry = false }: { retry?: boolean } = {}) {
+  if (retry) {
+    cachedSearchIndex = null;
+    searchIndexRequest = null;
+  }
+  if (cachedSearchIndex) return Promise.resolve(cachedSearchIndex);
+  if (searchIndexRequest) return searchIndexRequest;
+
+  searchIndexRequest = fetch('/api/search-index')
+    .then(async response => {
+      if (!response.ok) throw new Error('검색 데이터를 불러오지 못했습니다.');
+      const data = (await response.json()) as SearchIndexItem[];
+      cachedSearchIndex = data;
+      return data;
+    })
+    .finally(() => {
+      searchIndexRequest = null;
+    });
+
+  return searchIndexRequest;
+}
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -23,16 +49,29 @@ interface SearchHeaderProps {
 export function SearchModal({ isOpen, onClose }: SearchModalProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+  const [searchIndex, setSearchIndex] = useState<SearchIndexItem[]>(cachedSearchIndex ?? []);
+  const [indexLoading, setIndexLoading] = useState(cachedSearchIndex === null);
+  const [indexError, setIndexError] = useState<string | null>(null);
 
-  const {
-    searchQuery,
-    setSearchQuery,
-    searchResults,
-    isLoading,
-    hasQuery,
-    resultCount,
-    postsLoaded,
-  } = useSearch();
+  const { searchQuery, setSearchQuery, searchResults, isLoading, hasQuery, resultCount } =
+    useSearch(searchIndex);
+  const postsLoaded = !indexLoading && !indexError;
+
+  const requestSearchIndex = useCallback(async (retry = false) => {
+    setIndexLoading(true);
+    setIndexError(null);
+    try {
+      setSearchIndex(await loadSearchIndex({ retry }));
+    } catch (error) {
+      setIndexError(error instanceof Error ? error.message : '검색 데이터를 불러오지 못했습니다.');
+    } finally {
+      setIndexLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isOpen && !cachedSearchIndex) void requestSearchIndex();
+  }, [isOpen, requestSearchIndex]);
 
   // 모달이 열릴 때 입력 필드에 포커스
   useEffect(() => {
@@ -92,7 +131,15 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
         {/* 검색 바디 */}
         <div className="mb-4 flex-1 overflow-y-auto">
           {/* 포스트 데이터 로딩 중 */}
-          {!postsLoaded && <SearchLoadingState message="포스트 데이터 로딩 중..." />}
+          {indexLoading && <SearchLoadingState message="포스트 데이터 로딩 중..." />}
+          {indexError && (
+            <div className="flex flex-col items-center gap-3 px-4 py-10" role="alert">
+              <p className="text-sm text-red-600">{indexError}</p>
+              <Button variant="outline" onClick={() => void requestSearchIndex(true)}>
+                다시 시도
+              </Button>
+            </div>
+          )}
 
           {/* 검색 로딩 상태 */}
           {postsLoaded && isLoading && <SearchLoadingState message="검색 중..." />}

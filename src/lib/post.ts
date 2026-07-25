@@ -1,9 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
-import { cache } from 'react';
 import { calculateReadingTime, slugify } from './utils';
-// cache 제거: 원래 동작으로 복원
 import {
   SERIES_REGISTRY,
   type SeriesMeta,
@@ -50,25 +48,29 @@ function resolveCategoryName(slug: string): string {
   return registry[slug]?.name ?? slug;
 }
 
-type Metadata = {
+export type PostMetadata = {
   title: string;
   publishedAt: string;
   summary: string;
   image?: string;
+  cardImage?: string;
   series?: string;
   category?: string; // frontmatter에서 읽기(필수). 폴더에서 유도하지 않음
 };
 
-export type PostWithCategory = {
-  metadata: Metadata;
+export type PostSummary = {
+  metadata: PostMetadata;
   slug: string;
-  content: string;
   category: string; // slug
   categoryName: string; // korean name
-  fullPath: string;
   series?: string;
   image?: string; // 게시글 이미지 경로
   readingTime: number; // 읽기 시간 (분)
+};
+
+export type PostDocument = PostSummary & {
+  content: string;
+  fullPath: string;
 };
 
 export type CategoryInfo = {
@@ -107,16 +109,16 @@ function parseFrontmatter(fileContent: string, filePath: string) {
   const frontMatterBlock = match[1];
   const content = fileContent.replace(frontmatterRegex, '').trim();
   const frontMatterLines = frontMatterBlock.trim().split('\n');
-  const metadata: Partial<Metadata> = {};
+  const metadata: Partial<PostMetadata> = {};
 
   frontMatterLines.forEach(line => {
     const [key, ...valueArr] = line.split(': ');
     let value = valueArr.join(': ').trim();
     value = value.replace(/^['"](.*)['"]$/, '$1'); // Remove quotes
-    metadata[key.trim() as keyof Metadata] = value;
+    metadata[key.trim() as keyof PostMetadata] = value;
   });
 
-  return { metadata: metadata as Metadata, content };
+  return { metadata: metadata as PostMetadata, content };
 }
 
 function getAllMDXFiles(
@@ -156,7 +158,7 @@ function readMDXFile(filePath: string) {
   return parseFrontmatter(rawContent, filePath);
 }
 
-function loadBlogPosts(): PostWithCategory[] {
+function loadBlogPosts(): PostDocument[] {
   const contentsDir = path.join(process.cwd(), 'src', 'contents', 'posts');
   const allFiles = getAllMDXFiles(contentsDir);
 
@@ -165,7 +167,7 @@ function loadBlogPosts(): PostWithCategory[] {
     const slug = path.basename(relativePath);
     const readingTime = calculateReadingTime(content);
 
-    const category = String((metadata as Metadata).category || '').trim();
+    const category = String(metadata.category || '').trim();
     if (!category) {
       throw new Error(
         `MDX frontmatter에 category가 누락되었습니다: ${file}. 'category: <slug>'를 추가해주세요.`
@@ -202,9 +204,45 @@ function loadBlogPosts(): PostWithCategory[] {
   return posts;
 }
 
-export const getBlogPosts = cache(loadBlogPosts);
+let productionPostDocuments: PostDocument[] | null = null;
 
-export function getPostsBySeries(category: string, series: string): PostWithCategory[] {
+function getPostDocuments(): PostDocument[] {
+  if (process.env.NODE_ENV !== 'production') {
+    return loadBlogPosts();
+  }
+
+  if (!productionPostDocuments) {
+    productionPostDocuments = loadBlogPosts();
+  }
+
+  return productionPostDocuments;
+}
+
+function toPostSummary(post: PostDocument): PostSummary {
+  return {
+    metadata: post.metadata,
+    slug: post.slug,
+    category: post.category,
+    categoryName: post.categoryName,
+    series: post.series,
+    image: post.image,
+    readingTime: post.readingTime,
+  };
+}
+
+/**
+ * 단일 포스트 렌더링, RSS처럼 본문이 필요한 서버 코드에서만 사용합니다.
+ * 목록/API에서는 getPostSummaries()를 사용해야 합니다.
+ */
+export function getBlogPosts(): PostDocument[] {
+  return [...getPostDocuments()];
+}
+
+export function getPostSummaries(): PostSummary[] {
+  return getPostDocuments().map(toPostSummary);
+}
+
+export function getPostsBySeries(category: string, series: string): PostSummary[] {
   const categoryPosts = getPostsByCategory(category);
   const filtered = categoryPosts.filter(
     post => (post.series || '').trim().toLowerCase() === (series || '').trim().toLowerCase()
@@ -240,8 +278,8 @@ export function getPostsBySeries(category: string, series: string): PostWithCate
 }
 
 // 카테고리와 무관하게 시리즈명으로 전체 포스트 조회 (대소문자 무시)
-export function getPostsBySeriesName(seriesName: string): PostWithCategory[] {
-  const allPosts = getBlogPosts();
+export function getPostsBySeriesName(seriesName: string): PostSummary[] {
+  const allPosts = getPostSummaries();
   const target = (seriesName || '').trim().toLowerCase();
   return allPosts
     .filter(post => (post.series || '').trim().toLowerCase() === target)
@@ -251,13 +289,13 @@ export function getPostsBySeriesName(seriesName: string): PostWithCategory[] {
     );
 }
 
-export function getPostsByCategory(category: string): PostWithCategory[] {
-  const allPosts = getBlogPosts();
+export function getPostsByCategory(category: string): PostSummary[] {
+  const allPosts = getPostSummaries();
   return allPosts.filter(post => post.category === category);
 }
 
 export function getAllCategories(): CategoryInfo[] {
-  const allPosts = getBlogPosts();
+  const allPosts = getPostSummaries();
   const countMap = new Map<string, number>();
 
   allPosts.forEach(post => {
@@ -284,16 +322,16 @@ export function getAllCategories(): CategoryInfo[] {
   return result;
 }
 
-export function getPostBySlug(category: string, slug: string): PostWithCategory | undefined {
+export function getPostBySlug(category: string, slug: string): PostDocument | undefined {
   const allPosts = getBlogPosts();
   return allPosts.find(post => post.category === category && post.slug === slug);
 }
 
 // 모든 시리즈 집계
 export function getAllSeries(): SeriesInfo[] {
-  const posts = getBlogPosts().filter(p => (p.series || '').trim() !== '');
+  const posts = getPostSummaries().filter(p => (p.series || '').trim() !== '');
 
-  const seriesMap = new Map<string, PostWithCategory[]>();
+  const seriesMap = new Map<string, PostSummary[]>();
 
   posts.forEach(post => {
     const seriesName = (post.series || '').trim();
@@ -352,26 +390,23 @@ export function getBlogPostsLegacy() {
 }
 
 // 검색용 데이터 타입
-export interface SearchData {
-  slug: string;
-  category: string;
-  categoryName: string;
+export type SearchIndexItem = Pick<
+  PostSummary,
+  'slug' | 'category' | 'categoryName' | 'series' | 'image' | 'readingTime'
+> & {
   title: string;
   summary: string;
   publishedAt: string;
-  readingTime: number;
-  image?: string;
-  series?: string;
   seriesIndex?: number;
   seriesTitle?: string;
-}
+};
 
 // 검색 데이터 생성 함수
-export function generateSearchData(): SearchData[] {
-  const posts = getBlogPosts();
+export function generateSearchData(): SearchIndexItem[] {
+  const posts = getPostSummaries();
 
   // 시리즈별 정렬(레지스트리 order 우선, 없으면 발행일 오름차순)로 인덱스 맵 구성
-  const seriesToPosts = new Map<string, PostWithCategory[]>();
+  const seriesToPosts = new Map<string, PostSummary[]>();
   for (const p of posts) {
     const name = (p.series || '').trim();
     if (!name) continue;
@@ -386,11 +421,11 @@ export function generateSearchData(): SearchData[] {
     const orderIndex = new Map<string, number>();
     yamlOrder.forEach((slug, idx) => orderIndex.set(slug, idx));
 
-    let ordered: PostWithCategory[];
+    let ordered: PostSummary[];
     if (yamlOrder.length > 0) {
       const inYaml = yamlOrder
         .map(slug => seriesPosts.find(p => p.slug === slug))
-        .filter((v): v is PostWithCategory => !!v);
+        .filter((v): v is PostSummary => !!v);
       const notInYaml = seriesPosts
         .filter(p => !orderIndex.has(p.slug))
         .sort((a, b) => {
@@ -426,7 +461,7 @@ export function generateSearchData(): SearchData[] {
       summary: post.metadata.summary,
       publishedAt: post.metadata.publishedAt,
       readingTime: post.readingTime,
-      image: post.image || post.metadata.image, // PostWithCategory의 image 필드 우선 사용
+      image: post.image || post.metadata.image,
       series: post.series,
       seriesIndex: idx,
       seriesTitle: meta?.title || seriesName || undefined,

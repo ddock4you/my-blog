@@ -4,11 +4,16 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/validate-content.mjs && next build",
+    "content:validate": "node scripts/validate-content.mjs",
+    "fonts:sync": "node scripts/sync-ibm-plex-fonts.mjs",
+    "test:theme": "node --experimental-strip-types --test tests/theme.test.ts",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint .",
+    "perf:verify": "node scripts/verify-performance.mjs"
   },
   "dependencies": {
+    "@ibm/plex-sans-kr": "^1.1.0",
     "@mdx-js/loader": "^3.1.0",
     "@mdx-js/react": "^3.1.0",
     "@next/mdx": "16.1.6",
