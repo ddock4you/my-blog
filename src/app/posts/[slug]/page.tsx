@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (!post) return;
 
   const { title, publishedAt: publishedTime, summary: description, image } = post.metadata;
-  const ogImage = image ? image : `${baseUrl}/opengraph-image?title=${encodeURIComponent(title)}`;
+  const ogImage = image || `${baseUrl}/og.png`;
 
   return {
     title,
@@ -66,9 +66,7 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
               datePublished: post.metadata.publishedAt,
               authorName: 'Dev Thinking',
               url: `${baseUrl}/posts/${post.slug}`,
-              imageUrl:
-                post.metadata.image ||
-                `${baseUrl}/opengraph-image?title=${encodeURIComponent(post.metadata.title)}`,
+              imageUrl: post.metadata.image || `${baseUrl}/og.png`,
             })
           ),
         }}

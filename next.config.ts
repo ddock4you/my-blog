@@ -1,14 +1,14 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  output: 'export',
   // Configure `pageExtensions` to include markdown and MDX files
   pageExtensions: ['js', 'jsx', 'md', 'mdx', 'ts', 'tsx'],
-  // Optionally, add any other Next.js config below
   images: {
+    loader: 'custom',
+    loaderFile: './src/lib/staticImageLoader.ts',
     deviceSizes: [320, 360, 480, 640, 768],
     imageSizes: [160, 240],
-    formats: ['image/webp'],
-    qualities: [30, 75],
   },
 };
 

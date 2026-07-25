@@ -20,8 +20,6 @@ export default function PostCard({
           src={cardImage}
           alt={`${post.metadata.title} 썸네일`}
           fill
-          quality={post.metadata.cardImage ? undefined : 30}
-          unoptimized={Boolean(post.metadata.cardImage)}
           className="bg-bg-inverse-white object-cover"
           sizes="(max-width: 640px) calc(100vw - 3.5rem), 160px"
           loading={imagePriority ? 'eager' : 'lazy'}

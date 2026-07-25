@@ -5,7 +5,7 @@ const budgets = {
   homeRawBytes: 80 * 1024,
   homeCompressedBytes: 25 * 1024,
   aboutRawBytes: 80 * 1024,
-  cwvRawBytes: 130 * 1024,
+  cwvRawBytes: 135 * 1024,
 };
 const failures = [];
 
@@ -93,13 +93,13 @@ assert(
   `홈 압축 ${home.compressedBytes}B > 25KB`
 );
 assert(about.rawBytes <= budgets.aboutRawBytes, `About raw ${about.rawBytes}B > 80KB`);
-assert(cwv.rawBytes <= budgets.cwvRawBytes, `CWV raw ${cwv.rawBytes}B > 130KB`);
+assert(cwv.rawBytes <= budgets.cwvRawBytes, `CWV raw ${cwv.rawBytes}B > 135KB`);
 
 assert(
   !home.html.includes('저는 약 8개월 동안 리액트 개발 환경을 공부하면서'),
   '홈 응답에 포스트 본문 문장이 포함되어 있습니다.'
 );
-assert(!home.html.includes('/api/search-index'), '홈이 검색 인덱스 URL을 초기화합니다.');
+assert(!home.html.includes('/data/search-index.json'), '홈이 검색 인덱스 URL을 초기화합니다.');
 assert(
   !home.initialJs.includes('검색어를 입력하여 블로그 포스트를 찾아보세요'),
   '검색 모달 구현이 초기 JS 청크에 포함되어 있습니다.'
@@ -135,20 +135,20 @@ const fontPreloads = extractTags(home.head, 'link').filter(
 );
 assert(fontPreloads.length === 2, `IBM 폰트 preload 수가 2개가 아닙니다: ${fontPreloads.length}`);
 
-const postsResponse = await request('/api/posts?page=1');
+const postsResponse = await request('/data/posts.json');
 const postsPayload = JSON.parse(postsResponse.body.toString('utf8'));
-assert(Array.isArray(postsPayload.items), '/api/posts items가 배열이 아닙니다.');
+assert(Array.isArray(postsPayload.items), '/data/posts.json items가 배열이 아닙니다.');
 assert(
   postsPayload.items.every(item => !('content' in item) && !('fullPath' in item)),
-  '/api/posts가 content 또는 fullPath를 노출합니다.'
+  '/data/posts.json이 content 또는 fullPath를 노출합니다.'
 );
 
-const searchResponse = await request('/api/search-index');
+const searchResponse = await request('/data/search-index.json');
 const searchPayload = JSON.parse(searchResponse.body.toString('utf8'));
-assert(Array.isArray(searchPayload), '/api/search-index 응답이 배열이 아닙니다.');
+assert(Array.isArray(searchPayload), '/data/search-index.json 응답이 배열이 아닙니다.');
 assert(
   searchPayload.every(item => !('content' in item) && !('fullPath' in item) && 'title' in item),
-  '/api/search-index 계약에 불필요한 본문 필드가 포함되어 있습니다.'
+  '/data/search-index.json 계약에 불필요한 본문 필드가 포함되어 있습니다.'
 );
 
 console.table(

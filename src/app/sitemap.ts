@@ -1,6 +1,7 @@
 import { getBlogPosts, getAllCategories, getAllSeries } from '@/lib/post';
 
 export const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://my-blog-lake-ten.vercel.app';
+export const dynamic = 'force-static';
 
 export default async function sitemap() {
   const isoToday = new Date().toISOString();
@@ -19,13 +20,13 @@ export default async function sitemap() {
         new Date(b.metadata.publishedAt).getTime() - new Date(a.metadata.publishedAt).getTime()
     )[0];
     return {
-      url: `${baseUrl}/categories/${category.slug}`,
+      url: `${baseUrl}/?category=${encodeURIComponent(category.slug)}`,
       lastModified: last ? new Date(last.metadata.publishedAt).toISOString() : isoToday,
     };
   });
 
   // 기본 라우트들: 오늘 기준
-  const routes = ['', '/posts', '/about', '/series'].map(route => ({
+  const routes = ['', '/about', '/series'].map(route => ({
     url: `${baseUrl}${route}`,
     lastModified: isoToday,
   }));

@@ -1,4 +1,5 @@
 import React from 'react';
+import { preload } from 'react-dom';
 import type { Metadata } from 'next';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
@@ -23,35 +24,30 @@ export const metadata: Metadata = {
     siteName: blogMeta.title,
     locale: 'ko_KR',
     url: blogMeta.url,
-    images: ['/opengraph-image'],
+    images: ['/og.png'],
   },
   twitter: {
     card: 'summary_large_image',
     title: blogMeta.title,
     description: blogMeta.description,
-    images: ['/twitter-image'],
+    images: ['/og.png'],
   },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  preload('/fonts/ibm-plex-sans-kr/IBMPlexSansKR-Regular-92.woff2', {
+    as: 'font',
+    type: 'font/woff2',
+    crossOrigin: 'anonymous',
+  });
+  preload('/fonts/ibm-plex-sans-kr/IBMPlexSansKR-SemiBold-92.woff2', {
+    as: 'font',
+    type: 'font/woff2',
+    crossOrigin: 'anonymous',
+  });
+
   return (
     <html lang="ko" suppressHydrationWarning>
-      <head>
-        <link
-          rel="preload"
-          href="/fonts/ibm-plex-sans-kr/IBMPlexSansKR-Regular-92.woff2"
-          as="font"
-          type="font/woff2"
-          crossOrigin="anonymous"
-        />
-        <link
-          rel="preload"
-          href="/fonts/ibm-plex-sans-kr/IBMPlexSansKR-SemiBold-92.woff2"
-          as="font"
-          type="font/woff2"
-          crossOrigin="anonymous"
-        />
-      </head>
       <body
         className="font-ibm bg-bg-inverse-white box-sizing-border-box flex min-h-screen flex-col
           antialiased"

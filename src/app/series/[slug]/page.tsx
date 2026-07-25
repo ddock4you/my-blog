@@ -7,11 +7,15 @@ import SeriesPostList from '@/features/posts/components/SeriesPostList';
 import { loadSeriesPostInitialData } from '@/server/dataLoaders';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { Suspense } from 'react';
+import SeriesPostCard from '@/features/posts/components/SeriesPostCard';
 
 export async function generateStaticParams() {
   const seriesList = getAllSeries();
   return seriesList.map(s => ({ slug: s.slug }));
 }
+
+export const dynamicParams = false;
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -29,35 +33,32 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       title: `${title} - 시리즈`,
       description,
       url: `${baseUrl}/series/${series.slug}`,
-      images: series.coverImage ? [{ url: series.coverImage }] : ['/opengraph-image'],
+      images: series.coverImage ? [{ url: series.coverImage }] : ['/og.png'],
     },
     twitter: {
       card: 'summary_large_image',
       title: `${title} - 시리즈`,
       description,
-      images: series.coverImage ? [series.coverImage] : ['/twitter-image'],
+      images: series.coverImage ? [series.coverImage] : ['/og.png'],
     },
   };
 }
 
 export default async function SeriesDetailPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ page?: string; mode?: 'single' | 'cumulative' }>;
 }) {
   const { slug } = await params;
-  const { page, mode } = await searchParams;
   const seriesList = getAllSeries();
   const series = seriesList.find(s => s.slug === slug);
   if (!series) notFound();
 
-  const pageNum = Number.isFinite(Number(page)) && Number(page) > 0 ? Number(page) : 1;
-  const { items: initialItems, total } = await loadSeriesPostInitialData({
+  const { items: initialItems } = await loadSeriesPostInitialData({
     slug: series.slug,
-    page: Number(page),
-    mode: mode === 'single' ? 'single' : 'cumulative',
+    page: 1,
+    mode: 'cumulative',
+    pageSize: Number.MAX_SAFE_INTEGER,
   });
   return (
     <div className="flex w-full flex-col gap-10 pb-11">
@@ -116,11 +117,22 @@ export default async function SeriesDetailPage({
         </div>
       </section>
 
-      <SeriesPostList
-        slug={series.slug}
-        initialPage={pageNum}
-        initialData={{ items: initialItems, total, initialPageHydrated: pageNum }}
-      />
+      <Suspense
+        fallback={
+          <div className="flex flex-col gap-9">
+            {initialItems.slice(0, 10).map((post, index) => (
+              <SeriesPostCard
+                key={post.slug}
+                post={post}
+                idx={index}
+                count={initialItems.length}
+              />
+            ))}
+          </div>
+        }
+      >
+        <SeriesPostList posts={initialItems} />
+      </Suspense>
     </div>
   );
 }

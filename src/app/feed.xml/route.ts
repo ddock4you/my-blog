@@ -3,6 +3,8 @@ import { getBlogPosts } from '@/lib/post';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://my-blog-lake-ten.vercel.app';
 
+export const dynamic = 'force-static';
+
 export async function GET() {
   const posts = getBlogPosts().sort(
     (a, b) =>

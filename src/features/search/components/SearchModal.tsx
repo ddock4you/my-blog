@@ -19,7 +19,7 @@ function loadSearchIndex({ retry = false }: { retry?: boolean } = {}) {
   if (cachedSearchIndex) return Promise.resolve(cachedSearchIndex);
   if (searchIndexRequest) return searchIndexRequest;
 
-  searchIndexRequest = fetch('/api/search-index')
+  searchIndexRequest = fetch('/data/search-index.json')
     .then(async response => {
       if (!response.ok) throw new Error('검색 데이터를 불러오지 못했습니다.');
       const data = (await response.json()) as SearchIndexItem[];

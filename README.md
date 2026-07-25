@@ -11,11 +11,12 @@ Next.js(App Router) 기반의 **MDX 블로그/시리즈 사이트**입니다. �
 - **MDX 포스트 렌더링**: `src/contents/posts/**/index.mdx` 기반
 - **카테고리**: `src/data/categories.yaml`로 이름/정렬 제어
 - **시리즈**: `src/data/series/*.yaml`로 메타/목차 order 관리
-- **검색**: 서버에서 검색 인덱스 생성 후 Context로 제공
+- **검색**: 빌드 시 생성한 정적 검색 인덱스를 브라우저에서 조회
 - **다크모드**: `localStorage(darkMode)` + 시스템 선호도
 - **댓글**: Giscus(선택, env로 설정)
 - **분석**: Vercel Analytics + Google Analytics/GTM(선택, env로 설정)
-- **SEO**: 메타데이터, JSON-LD, `/feed.xml`, `/sitemap.xml`, `/robots.txt`, OG/Twitter 이미지
+- **SEO**: 메타데이터, JSON-LD, 정적 RSS/사이트맵/OG 이미지
+- **정적 배포**: 요청 시 Vercel Function/Edge Runtime/Image Optimization 없이 `out/` 제공
 
 ### 기술 스택
 
@@ -40,13 +41,17 @@ pnpm dev
 
 브라우저에서 `http://localhost:3000`을 엽니다.
 
-### 빌드/실행/린트
+### 빌드/린트
 
 ```bash
 pnpm build
 pnpm start
 pnpm lint
 ```
+
+`pnpm build`는 원본 이미지를 WebP로 변환한 다음 완전 정적 사이트를 `out/`에 생성하고,
+함수 산출물·이미지 최적화 URL·100MB 제한을 자동 검증합니다.
+`pnpm start`는 생성된 `out/`을 로컬 정적 서버로 제공합니다.
 
 ## 환경변수
 
@@ -84,18 +89,28 @@ publishedAt: 2026-02-03
 summary: 한 줄 요약
 category: nextjs
 series: nextjsDocs
-image: /contents/posts/<slug>/images/cover.png
+image: /contents/posts/<slug>/images/cover.webp
 ---
 
 내용...
 ```
 
-### 이미지 경로
+### 이미지 경로와 사전 압축
 
-`src/contents` 아래 파일은 `/contents/*`로 접근하도록 rewrite 되어 있습니다.
+PNG/JPEG 원본은 배포되지 않는 `assets/images-original`에 `public`과 같은 상대 경로로
+저장합니다.
 
-- 예: `src/contents/posts/a-post/images/pic.png`
-  → `/contents/posts/a-post/images/pic.png`
+- 원본: `assets/images-original/contents/posts/a-post/images/pic.png`
+- MDX 참조: `/contents/posts/a-post/images/pic.webp`
+
+다음 명령은 기본 WebP와 160~768px 반응형 변형, manifest, 정적 OG 이미지를 생성·검증합니다.
+
+```bash
+pnpm images:build
+pnpm images:verify
+```
+
+`pnpm dev`와 `pnpm build`에서도 이미지 생성이 먼저 실행됩니다.
 
 ## 시리즈/카테고리 데이터
 
@@ -108,7 +123,7 @@ image: /contents/posts/<slug>/images/cover.png
 
 - 폴더: `src/data/series/*.yaml`
 - 주요 필드: `title`, `description`, `inSeries`, `order`, `aliases`, `coverImage`
-- **중요**: 시리즈 상세/API에서 정렬을 위해 `order`가 사용됩니다. 시리즈를 운영하려면 `order`에 포스트 slug들을 정의하는 것을 권장합니다.
+- **중요**: 시리즈 상세/정적 데이터에서 정렬을 위해 `order`가 사용됩니다.
 
 ## 제공 엔드포인트
 
@@ -120,15 +135,15 @@ image: /contents/posts/<slug>/images/cover.png
 - `/series/[slug]` 시리즈 상세
 - `/about` 소개
 
-### API
+### 정적 데이터
 
-- `GET /api/posts?category=&page=`
-  - 헤더 `x-page-size`로 pageSize 제어(기본 10)
-- `GET /api/series?page=`
-  - 헤더 `x-page-size`로 pageSize 제어(기본 10)
-- `GET /api/series/[slug]?page=&mode=`
-  - `mode`: `cumulative`(누적) | `single`(페이지 단위)
-  - 헤더 `x-page-size`로 pageSize 제어(기본 10)
+- `/data/posts.json`: 전체 포스트 요약
+- `/data/series.json`: 전체 시리즈
+- `/data/series/[slug]`: 시리즈별 전체 포스트
+- `/data/search-index.json`: 검색 인덱스
+
+카테고리 필터와 `page`/`mode` 페이지네이션은 브라우저에서 정적 컬렉션을 대상으로
+처리합니다.
 
 ### SEO/Feed
 
@@ -136,9 +151,9 @@ image: /contents/posts/<slug>/images/cover.png
 - `/series/[slug]/feed.xml` 시리즈 RSS
 - `/sitemap.xml` 사이트맵
 - `/robots.txt` 로봇 규칙
-- `/opengraph-image?title=` OG 이미지
-- `/twitter-image?title=` Twitter 카드 이미지
+- `/og.png` OG/Twitter 공용 이미지
 
 ## 배포
 
-Vercel 배포를 권장합니다. 배포 환경에서는 `NEXT_PUBLIC_SITE_URL`을 실제 도메인으로 설정하세요(사이트맵/RSS/메타데이터 URL 정합성에 필요).
+Vercel 배포 환경에서는 `NEXT_PUBLIC_SITE_URL`을 실제 도메인으로 설정하세요. 배포물은
+정적 파일로만 구성되며 Vercel Web Analytics는 유지됩니다.

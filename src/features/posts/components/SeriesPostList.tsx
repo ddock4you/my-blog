@@ -1,43 +1,26 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useLoadMorePagination } from '@/hooks/useLoadMorePagination';
+import { useStaticPagination } from '@/hooks/useStaticPagination';
 import { Button } from '@/components/ui/button';
 import SeriesPostCard from '@/features/posts/components/SeriesPostCard';
 import type { PostSummary } from '@/lib/post';
 
 type Props = {
-  slug: string;
-  initialPage: number;
-  initialData: { items: PostSummary[]; total: number; initialPageHydrated?: number };
+  posts: PostSummary[];
 };
 
-export default function SeriesPostList({ slug, initialPage, initialData }: Props) {
-  const fetcher = useMemo(
-    () => (p: number, ps: number) =>
-      fetch(`/api/series/${slug}?page=${p}&mode=single`, {
-        headers: { 'x-page-size': String(ps) },
-      }).then(r => r.json()),
-    [slug]
-  );
-
-  const { items, page, totalPages, hasMore, isLoading, loadMore } =
-    useLoadMorePagination<PostSummary>({
-      fetchPage: fetcher,
-      initialPage,
-      initialData,
-    });
+export default function SeriesPostList({ posts }: Props) {
+  const { items, page, totalPages, hasMore, loadMore } = useStaticPagination(posts);
 
   return (
     <div className="flex flex-col gap-9">
       {items.map((post, idx) => (
-        <SeriesPostCard key={post.slug} post={post} idx={idx} count={initialData.total} />
+        <SeriesPostCard key={post.slug} post={post} idx={idx} count={posts.length} />
       ))}
       {hasMore && (
         <div className="flex w-full items-center justify-center">
           <Button
             aria-label={`더보기 ${Math.min(page, totalPages)}/${totalPages || 0}`}
-            disabled={isLoading || page >= totalPages}
             onClick={loadMore}
             variant="outline"
           >

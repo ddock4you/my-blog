@@ -1,7 +1,16 @@
 import { NextResponse } from 'next/server';
 import { getAllSeries, getPostsBySeriesName } from '@/lib/post';
 
-export async function GET(req: Request, { params }: { params: Promise<{ slug: string }> }) {
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://my-blog-lake-ten.vercel.app';
+
+export const dynamic = 'force-static';
+export const dynamicParams = false;
+
+export function generateStaticParams() {
+  return getAllSeries().map(series => ({ slug: series.slug }));
+}
+
+export async function GET(_request: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const seriesList = getAllSeries();
   const series = seriesList.find(s => s.slug === slug);
@@ -16,10 +25,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
       p => `
       <item>
         <title>${escapeXml(p.metadata.title)}</title>
-        <link>${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/posts/${p.slug}</link>
+        <link>${SITE_URL}/posts/${p.slug}</link>
         <description>${escapeXml(p.metadata.summary)}</description>
         <pubDate>${new Date(p.metadata.publishedAt).toUTCString()}</pubDate>
-        <guid>${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/posts/${p.slug}</guid>
+        <guid>${SITE_URL}/posts/${p.slug}</guid>
       </item>
     `
     )
@@ -29,7 +38,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
   <rss version="2.0">
     <channel>
       <title>${escapeXml(series.meta?.title || series.name)}</title>
-      <link>${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/series/${series.slug}</link>
+      <link>${SITE_URL}/series/${series.slug}</link>
       <description>${escapeXml(series.meta?.description || series.firstPostSummary || '')}</description>
       ${feedItems}
     </channel>
